@@ -1,0 +1,8 @@
+*.pyc
+*.swp
+.idea
+*.iml
+*.zip
+.vscode
+*.code-workspace
+copy.sh
