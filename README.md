@@ -1,7 +1,5 @@
 # Welcome to the SMuFF for Klipper project
 
-***
-
 ![The SMuFF](https://github.com/technik-gegg/SMuFF-1.1/raw/SMuFF-3.0/images/SMuFF-V6.png)
 
 This is a module (plugin) for Klipper which handles tool changes on the [SMuFF](https://sites.google.com/view/the-smuff).
@@ -59,8 +57,6 @@ the Klipper console:
 
 The sheer number of commands and properties results from the fact that the SMuFF has its own controller and processes all commands internally. Klipper only sends SMuFF specific GCodes over the serial interface.
 
-***
-
 ## Setup
 
 Please visit [this webpage](https://sites.google.com/view/the-smuff/how-to/tutorials/configure-klipper) to see the steps that are necessary to install it.
@@ -81,8 +77,6 @@ autoconnect=yes
 hasCutter=yes
 hasWiper=no
 ```
-
-***
 
 ## Troubleshooting
 
