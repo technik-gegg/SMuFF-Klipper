@@ -59,7 +59,7 @@ The sheer number of commands and properties results from the fact that the SMuFF
 
 ## Setup
 
-Please visit [this webpage](https://sites.google.com/view/the-smuff/how-to/tutorials/configure-klipper) to see the steps that are necessary to install it.
+Please visit [this webpage](https://sites.google.com/view/the-smuff/how-to/configure/the-klipper-module) to see the steps that are necessary to install it.
 It's a pretty simple and stright forward process, which is mostly accomplished by copying a couple of files.
 
 The basic settings of the module are located in the **smuff.cfg** file, which eventually has to be included in your **printer.cfg** file. The settings shown in the example below reflect the standard configuration. The only modification you may need to make are for *commandTimeout* and *toolchangeTimeout*. Those depend on the environment your SMuFF is running in.
