@@ -5,4 +5,5 @@
 *.zip
 .vscode
 *.code-workspace
-copy.sh
+copy.*
+

@@ -4,20 +4,20 @@
 
 This is a module (plugin) for Klipper which handles tool changes on the [SMuFF](https://sites.google.com/view/the-smuff).
 
-This version implements the following GCodes which can be accessed from
+This version implements the following GCodes, which can be accessed from
 the Klipper console:
 
 | GCode | Description |
-|-------|----------------|
+|-------|-------------|
 | SMUFF_CONN | Connect to the SMuFF via serial interface |
 | SMUFF_DISC | Disconnect from the SMuFF |
 | SMUFF_CONNECTED | Show current connection status |
 | SMUFF_CUT | Cut filament (if Filament-Cutter is configured) |
 | SMUFF_WIPE | Wipe nozzle (if Wiper is installed) |
-| SMUFF_LID_OPEN | Open lid servo |
-| SMUFF_LID_CLOSE | Close lid servo |
+| SMUFF_LID_OPEN | Open then Lid servo |
+| SMUFF_LID_CLOSE | Close the Lid servo |
 | SMUFF_SET_SERVO | Position a servo |
-| SMUFF_TOOL_CHANGE | Change the current tool (mainly called from Tn GCodes) |
+| SMUFF_TOOL_CHANGE | Change the current tool (mainly called from T*n* GCode macros) |
 | SMUFF_INFO | Query the firmware info from SMuFF |
 | SMUFF_STATUS | Query the status from SMuFF |
 | SMUFF_SEND | Send GCode to the SMuFF |
@@ -29,8 +29,20 @@ the Klipper console:
 | SMUFF_UNLOAD | Unload filament from active tool on the SMuFF |
 | SMUFF_HOME | Home Selector (and Revolver if available) |
 | SMUFF_MOTORS_OFF | Turn stepper motors on the SMuFF off |
-| SMUFF_CLEAR_JAM | Resets the Feeder Jammed flag on the SMuFF |
-| SMUFF_RESET | Resets the SMuFF |
+| SMUFF_CLEAR_JAM | Resets the *Feeder Jammed* flag on the SMuFF |
+| SMUFF_RESET | Restarts the SMuFF |
+| SMUFF_VERSION | Query the SMuFF module version |
+| SMUFF_RESET_AVG | Reset tool change statistics |
+
+Most macros don't require any parameter, except these macros:
+| GCode | Parameter(s) | Type | Description |
+|-------|--------------|------|-------------|
+|SMUFF_TOOL_CHANGE|**T**|int|Specifies the tool number to switch to (i.e. *T=2*)|
+|SMUFF_SET_SERVO|**SERVO, ANGLE**|int, int|Specify the servo index and the position in degrees (i.e. *SERVO=1 ANGLE=55*)|
+|SMUFF_PARAM|**PARAM, VALUE**|string, string|Specify the parameter name and its value to set in the SMuFF (i.e. *PARAM="AnimBPM" VALUE="40"*)|
+|SMUFF_SEND|**GCODE**|string|Specifies the GCode to send to the SMuFF (i.e. *GCODE="M119"*)|
+
+When you're using the **SMUFF_PARAM** macro to change settings on the SMuFF on the fly, make sure you call a **SMUFF_SEND GCODE="M500"** afterwards in order to make those settings permanent (SMuFF will then save them to the SD-Card).
 
  During runtime you have acces to the following properties from within scripts or macros:
 
@@ -53,16 +65,37 @@ the Klipper console:
 |printer.smuff.lidstate | (bool) | True if Lid is closed |
 |printer.smuff.hascutter | (bool) | True if Filament-Cutter is configured |
 |printer.smuff.haswiper | (bool) | True if Wiper is configured |
+|printer.smuff.hassplitter | (bool) | True if Splitter option is configured |
+|printer.smuff.isdde | (bool) | True if DDE is configured |
 |printer.smuff.device | (string) | Name of the SMuFF |
+|printer.smuff.materials | (array) | Two dimensional array of materials. Index 0 is the tool number, index 1 is an array with: Material, Color, Purge-Factor |
+|printer.smuff.swaps | (array) | Array of tool swaps |
+|printer.smuff.lidmappings | (array) | Array of lid mappings |
+|printer.smuff.version | (float) | Current module version number |
+|printer.smuff.fwversion | (string) | Current SMuFF firmware version |
+|printer.smuff.fwmode | (string) | Current SMuFF mode setting (SMUFF/PMMU2) |
+|printer.smuff.fwoptions | (string) | Options installed on the SMuFF |
+|printer.smuff.loadstate | (int) | The current tool filament load state: (***-1** = no tool selected, **0** = not loaded, **1** = loaded to Selector, **2** =  loaded to Nozzle, **3** = loaded to DDE*)  |
 
-The sheer number of commands and properties results from the fact that the SMuFF has its own controller and processes all commands internally. Klipper only sends SMuFF specific GCodes over the serial interface.
+**Please keep in mind:** The sheer number of commands and properties results from the fact that the SMuFF has its own controller and processes all commands internally. Klipper only sends SMuFF specific GCodes over the serial interface.
+You'll need to access those only if you're about to extend the SMuFF-Klipper module functions for some specific reason.
 
 ## Setup
 
 Please visit [this webpage](https://sites.google.com/view/the-smuff/how-to/configure/the-klipper-module) to see the steps that are necessary to install it.
 It's a pretty simple and stright forward process, which is mostly accomplished by copying a couple of files.
 
-The basic settings of the module are located in the **smuff.cfg** file, which eventually has to be included in your **printer.cfg** file. The settings shown in the example below reflect the standard configuration. The only modification you may need to make are for *commandTimeout* and *toolchangeTimeout*. Those depend on the environment your SMuFF is running in.
+To get the files on your target Raspberry Pi, it's recommended using the following commands in a SSH session:
+
+```sh
+    cd ~
+    git clone https://github.com/technik-gegg/SMuFF-Klipper
+    cd SMuFF-Klipper
+```
+
+After that, simply copy the files into their destination folder.
+
+All the basic settings for the module are located in the **smuff.cfg** file, which eventually has to be included in your **printer.cfg** file. The settings shown in the example below reflect the standard configuration. The only modification you may need to make are for *commandTimeout* and *toolchangeTimeout*. Those depend on the environment your SMuFF is running in.
 
 ```Python
 
@@ -70,26 +103,49 @@ The basic settings of the module are located in the **smuff.cfg** file, which ev
 serial=/dev/serial/ttySMuFF
 baudrate=115200
 serialTimeout=10
+autoConnectSerial=yes
 commandTimeout=25
 toolchangeTimeout=90
 autoload=yes
-autoconnect=yes
 hasCutter=yes
 hasWiper=no
+debug=no
 ```
+
+Most of the settings in here are self explanatory. The **autoConnectSerial** will automatically establish a connection to the SMuFF after a restart of Klipper, if set to *yes*.
+The latter option **debug** is set to *no* by default. Set this to *yes* if you are troubleshooting and need to know a bit more about what the SMuFF is doing/sending. Turn it back off when you're finished, otherwise it may overwhelm your Klipper log file.
 
 ## Troubleshooting
 
 If you run into some issues / strange behaviours when connecting the SMuFF to Klipper, you have to look into the Klipper logfile to fully understand what's going on. The easiest way to do so it to open a SSH connection to your Raspberry Pi and launch the following command:
 
 ```sh
-tail -f /home/pi/klipper_logs/klippy.log | grep -A20 "SMuFF" || "Trace"
+tail -f /home/pi/klipper_logs/klippy.log | grep -A5 "SMuFF" || "Trace"
 ```
 
-This way only SMuFF related logs and Tracebacks (Exceptions) are being shown continously. It helped me a lot while developing the module, so it might be of help for you too.
+This way only SMuFF related logs and Tracebacks (Exceptions) are being shown continously. It helped me a lot while developing the module, so it might be helpful for you too.
+*For tracebacks you may have to modify the -A parameter and nudge up the number to see the full trace.*
 
 ***
 
 ## Recent changes
+
+**V1.1** - Some bug fixes and module extensions
+
+- added GCode to query the module version (since this most probably won't be the last version published)
+- added a few more info logs (for easier debugging)
+- added automatic retrival of material, swaps and lid-mappings from SMuFF at init
+- added GCodes *PRINT_SMUFF_MATERIALS* and *PRINT_SMUFF_SWAPS* to smuff.cfg to demonstrate how to retrieve data from the module via **Jinja** scripting
+- changed display menu to show only configured tools (the number of active tools is being read out from the SMuFF)
+- separated display menus into *smuff_menu.cfg* (Klipper won't start if it's being configured for headless mode and display menus are defined)
+- made the serial communication far more stable/reliable. Klipper won't raise any "**SD Busy**" or "**Shutdown**" messages when printing anymore
+- added *version*, *fwversion*, *fwmode*, *fwoptions*, *loadstate*, *isdde* and *hassplitter* variables for scripting
+- added macro *PARK_TOOLHEAD* in *smuff.cfg*
+- added more useful information to SMUFF_STATUS macro
+- added debug option in *smuff.cfg* for more output to log file if needed
+- renamed all internal methods with an preceeding underscore (_)
+- extracted all texts supposed to be printed in console for easier localization
+- updated tool change GCode macros in *smuff.cfg*
+- added a tool change counter as well as the average tool change duration time for stats. Keep in mind that these will be reset when Klipper needs a restart. If you want to reset them manually, use the SMUFF_RESET_AVG macro
 
 **V1.0** - Initial release
