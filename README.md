@@ -11,7 +11,6 @@ the Klipper console:
 |-------|-------------|
 | SMUFF_CONN | Connect to the SMuFF via serial interface |
 | SMUFF_DISC | Disconnect from the SMuFF |
-| SMUFF_CONNECTED | Show current connection status |
 | SMUFF_CUT | Cut filament (if Filament-Cutter is configured) |
 | SMUFF_WIPE | Wipe nozzle (if Wiper is installed) |
 | SMUFF_LID_OPEN | Open then Lid servo |
@@ -129,6 +128,11 @@ This way only SMuFF related logs and Tracebacks (Exceptions) are being shown con
 ***
 
 ## Recent changes
+
+**V1.11** - Revised serial watchdog / fixed typos
+
+- changed behaviour of serial watchdog, so that it relialbly reconnects when a connection to the SMuFF was lost
+- fixed some typos in comments
 
 **V1.1** - Some bug fixes and module extensions
 

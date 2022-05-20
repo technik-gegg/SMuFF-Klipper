@@ -179,7 +179,7 @@ except ImportError:
 from threading import Thread, Event
 from pprint import pformat
 
-VERSION_NUMBER 	= 1.1 				# Module version number (for scripting)
+VERSION_NUMBER 	= 1.11 				# Module version number (for scripting)
 VERSION_DATE 	= "2022/05/19"
 VERSION_STRING	= "SMuFF Module V{0} ({1})" # Module version string
 
@@ -187,8 +187,8 @@ WD_TIMEOUT 		= 10.0				# serial watchdog default timeout
 
 FWINFO		= "M115"        		# SMuFF GCode to query firmware info
 PERSTATE    = "M155"     			# SMuFF GCode for enabling sending periodical states
-OPT_ON 		= " S1"
-OPT_OFF		= " S0"
+OPT_ON 		= " S1" 				# SMuFF GCode option for turning features on
+OPT_OFF		= " S0"					# SMuFF GCode option for turning features off
 WIPE		= "G12"         		# SMuFF GCode to wipe nozzle
 CUT			= "G12 C"        		# SMuFF GCode to cut filament
 SETSERVO	= "M280 P{0} S{1}" 		# SMuFF GCode to position a servo
@@ -220,7 +220,7 @@ T_OPENED			= "OPENED"
 T_CLOSED			= "CLOSED"
 T_NO_TOOL 			= "NO TOOL"
 T_TO_SPLITTER		= "TO SPLITTER"
-T_TO_SELECTOR 		= "TO  SELECTOR"
+T_TO_SELECTOR 		= "TO SELECTOR"
 T_TO_DDE 			= "TO DDE"
 T_INVALID_STATE 	= "UNKNOWN"
 T_CFG_GCODE_ERR		= "SMuFF requires [{0}] to work, please add it to your config!"
@@ -302,7 +302,7 @@ T_HELP_RESET_AVG	= "Reset tool change average statistics."
 T_HELP_DUMP_RAW		= "Prints out raw sent/received data (for debugging only)."
 
 
-# Response srings coming from SMuFF
+# Response strings coming from SMuFF
 R_START			= "start\n"
 R_OK			= "ok\n"
 R_ECHO			= "echo:"
@@ -315,7 +315,7 @@ R_JSON			= "{"
 R_JSONCAT		= "/*"
 R_FWINFO		= "FIRMWARE_"
 
-# Some keywords sent by the SMuFF
+# Some keywords sent by the SMuFF (as JSON config header)
 C_BASIC 		= "basic"
 C_STEPPERS 		= "steppers"
 C_TMC 			= "tmc driver"
@@ -527,12 +527,14 @@ class SMuFF:
     # Klippy connect handler
     #
 	def event_connect(self):
+		# no further action in here
 		self._log.info("Klippy has connected")
 
     #
     # Klippy ready handler
     #
 	def event_ready(self):
+		# check presence of PRE/POST_TOOLCHANGE macros
 		self._log.info("Klippy is ready")
 		if not PRE_TC in self.gcode.ready_gcode_handlers:
 			raise self._printer.config_error(T_CFG_GCODE_ERR.format("gcode_macro '{0}'".format(PRE_TC)))
@@ -554,7 +556,7 @@ class SMuFF:
 		try:
 			self._connect_SMuFF(gcmd)
 			if autoConnect and autoConnect ==  True:
-				return True
+				return self._isConnected
 		except Exception as err:
 			self.gcode.respond_info(T_CONN_EX.format(err))
 			return False
@@ -694,10 +696,10 @@ class SMuFF:
 			durationAvg =  (self._durationTotal / self._tcCount) if self._durationTotal > 0 and self._tcCount > 0 else 0
 			loadState = {
 				-1: T_NO_TOOL,
-					0: T_NO,
-					1: T_TO_SPLITTER if self._hasSplitter else T_TO_SELECTOR,
-					2: T_YES,
-					3: T_TO_DDE
+				0: T_NO,
+				1: T_TO_SPLITTER if self._hasSplitter else T_TO_SELECTOR,
+				2: T_YES,
+				3: T_TO_DDE
 			}
 			loaded = loadState.get(self._loadState, T_INVALID_STATE)
 
@@ -1024,7 +1026,7 @@ class SMuFF:
 			self._tcState = 6
 			return eventtime + 0.1
 
-		# state 6: calculate duration and end
+		# state 6: calculate duration
 		elif self._tcState == 6:
 			duration = (self._nowMS()-self._tcStartTime)/1000
 			self._durationTotal += duration
@@ -1043,13 +1045,13 @@ class SMuFF:
 	def _wait_for_ok(self, eventtime):
 		if self._lastCmdDone:
 			if self._isError:
-				self._log.info("_wait_for_ok done got ERROR response")
+				self._log.info("waiting done, got ERROR response")
 			else:
-				self._log.info("_wait_for_ok done, got OK response")
+				self._log.info("waiting done, got OK response")
 			self._reactor.unregister_timer(self._okTimer)
 			self._okTimer = None
 		else:
-			self._log.info("waiting for ok...")
+			self._log.info("waiting for OK response...")
 			return eventtime + 2.0
 
 	#
@@ -1255,11 +1257,11 @@ class SMuFF:
 		time.sleep(3)
 
 		while 1:
-			if self._stopSerial == True:
+			if self._isConnected and self._stopSerial == True:
 				break 
 			if self.cmd_connect(autoConnect=True) == True:
 				break
-			time.sleep(1)
+			time.sleep(3)
 			self._log.info("Serial connector looping...")
 
 		# as soon as the connection has been established, cancel the connector thread
@@ -1295,9 +1297,11 @@ class SMuFF:
 			if self._stopSerial:
 				break
 			if is_set == False:
-				self._log.info("Serial watchdog timed out... (={0} sec.)".format(self._wdTimeout))
-				#reconnect = Thread(target=self._reconnect_SMuFF, name="TReconnect").start()
-				#break
+				self._log.info("Serial watchdog timed out... (no sign of life within {0} sec.)".format(self._wdTimeout))
+				reconnect = Thread(target=self._reconnect_SMuFF, name="TReconnect")
+				reconnect.daemon = True
+				reconnect.start()
+				break
 
 		self._log.info("Shutting down serial watchdog")
 	
@@ -1306,7 +1310,7 @@ class SMuFF:
     #
 	def _reconnect_SMuFF(self):
 		if self._sconnector:
-			self._log.info("Connector thread running, aborting reconnect request...")
+			self._log.info("Connector thread already running, aborting reconnect request...")
 			return
 		self._close_serial()
 		self._isReconnect = True
@@ -1318,8 +1322,7 @@ class SMuFF:
 			self.start_connector()
 		else:
 			if self._serial.is_open:
-				if self._send_SMuFF_and_wait(FWINFO) == None:
-					self._log.info("No valid response, starting connector")
+				self._init_SMuFF()
 
 
     #
@@ -1621,20 +1624,20 @@ class SMuFF:
 			# don't process any general debug messages
 			index = len(R_ECHO)+1
 			if data[index:].startswith(R_DEBUG):
-				self._log.debug("SMuFF has sent a debug response: [" + data.rstrip() + "]")
+				self._log.debug("SMuFF has sent a debug response: [{0}]".format(data.rstrip()))
 			# but do process the tool/endstop states
 			elif data[index:].startswith(R_STATES):
 				self._parse_states(data.rstrip())
 			# and register whether SMuFF is busy
 			elif data[index:].startswith(R_BUSY):
-				err = "SMuFF has sent a busy response: [" + data.rstrip() + "]"
+				err = "SMuFF has sent a busy response: [{0}]".format(data.rstrip())
 				self._log.debug(err)
 				self.gcode.respond_info(err)
 				self._set_busy(True)
 			return
 
 		if data.startswith(R_ERROR):
-			err = "SMuFF has sent an error response: [" + data.rstrip() + "]"
+			err = "SMuFF has sent an error response: [{0}]".format(data.rstrip())
 			self._log.info(err)
 			self.gcode.respond_info(err)
 			index = len(R_ERROR)+1
@@ -1649,13 +1652,13 @@ class SMuFF:
 			return
 
 		if data.startswith(ACTION_CMD):
-			self._log.debug("SMuFF has sent an action request: [" + data.rstrip() + "]")
+			self._log.debug("SMuFF has sent an action request: [{0}]".format(data.rstrip()))
 			index = len(ACTION_CMD)
 			# what action is it? is it a tool change?
 			if data[index:].startswith(TOOL):
 				tool = self._parse_tool_number(data[10:])
 				# only if the printer isn't printing
-				if self._is_printing():
+				if self._is_printing() == False:
 					# query the heater 
 					heater = self._printer.lookup_object("heater")
 					try:
@@ -1675,20 +1678,20 @@ class SMuFF:
 
 			if data[index:].startswith(ACTION_WAIT):
 				self._waitRequested = True
-				self._log.info("waiting for SMuFF to come clear...")
+				self._log.info("Waiting for SMuFF to come clear... (ACTION_WAIT)")
 
 			if data[index:].startswith(ACTION_CONTINUE):
 				self._waitRequested = False
 				self._abortRequested = False
-				self._log.info("continuing after SMuFF cleared...")
+				self._log.info("Continuing after SMuFF cleared... (ACTION_CONTINUE)")
 
 			if data[index:].startswith(ACTION_ABORT):
 				self._waitRequested = False
 				self._abortRequested = True
-				self._log.info("SMuFF is aborting action operation...")
+				self._log.info("SMuFF is aborting action operation... (ACTION_ABORT)")
 
 			if data[index:].startswith(ACTION_PONG):
-				self._log.info("PONG received from SMuFF")
+				self._log.info("PONG received from SMuFF (ACTION_PONG)")
 			return
 
 		if data.startswith(R_JSONCAT):
