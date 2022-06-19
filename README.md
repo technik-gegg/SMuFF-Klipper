@@ -129,6 +129,13 @@ This way only SMuFF related logs and Tracebacks (Exceptions) are being shown con
 
 ## Recent changes
 
+**V1.12** - Added smuff_runout.cfg / Potential bugfix
+
+- added **smuff_runout.cfg**. This macro **may** be used to swap tools sequentially if a runout sensor triggers.
+**The thought behind is:** If your runout sensor triggers, the script will determine the next (logical) tool (i.e. activetool + 1) and switch to it. This would allow for continous printing on huge models which may reqiure more than one spool of filament to complete.
+**Please notice:** This macro hasn't been tested yet and it'll require that you configure your runout sensor accordingly. If you'd like to use this script, simply add an include in your *printer.cfg*.
+- added a return value (eventtime) after reactor timers have been disposed, just in case Klipper is trying to evaluate the return value, which seems to be the case with the latest  version
+
 **V1.11** - Revised serial watchdog / fixed typos
 
 - changed behaviour of serial watchdog, so that it relialbly reconnects when a connection to the SMuFF was lost

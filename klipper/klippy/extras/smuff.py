@@ -7,7 +7,7 @@
 # This file may be distributed under the terms of the GNU GPLv3 license.
 #
 #
-# This version implements the following GCodes which can be accessed from 
+# This version implements the following GCodes which can be accessed from
 # the Klipper console:
 #
 #   SMUFF_CONN          - Connect to the SMuFF via serial interface
@@ -47,7 +47,7 @@
 #	printer.smuff.feeder2			(bool) 		True = triggered
 #	printer.smuff.fwinfo			(string)	Same as with M115 GCode command
 #	printer.smuff.isbusy			(bool)		True if SMuFF is doing stuff
-#	printer.smuff.iserror			(bool)		True if the last command processed did fail 
+#	printer.smuff.iserror			(bool)		True if the last command processed did fail
 #	printer.smuff.isprocessing		(bool)		True while processing stuff
 #	printer.smuff.isconnected		(bool)		True when connected through serial port
 #	printer.smuff.isidle			(bool)		True if SMuFF is in idle state
@@ -85,14 +85,14 @@
 #	debug=no
 #
 #
-# PRE_TOOLCHANGE and POST_TOOLCHANGE will be called from within 
-# the module in order to prepare the printer for a tool change / 
+# PRE_TOOLCHANGE and POST_TOOLCHANGE will be called from within
+# the module in order to prepare the printer for a tool change /
 # resume printing.
 #
 # Basically it's pausing/resuming the print but you can put in
 # different commands, such like wiping, purging or ramming,
 # if needed.
-# 
+#
 # PARK_TOOLHEAD macro sets the toolhead to a save position for
 # the tool change. Modify the positions to suite your printer
 # if needed.
@@ -143,8 +143,8 @@
 #     G90
 #     G1 Z{z_safe} F2000
 #     G1 X{x_park} Y{y_park} F12000
-#     {% if printer.gcode_move.absolute_coordinates|lower == 'false' %} 
-#       G91 
+#     {% if printer.gcode_move.absolute_coordinates|lower == 'false' %}
+#       G91
 #     {% endif %}
 #   {% else %}
 #     {action_respond_info("Printer is not homed!")}
@@ -179,8 +179,8 @@ except ImportError:
 from threading import Thread, Event
 from pprint import pformat
 
-VERSION_NUMBER 	= 1.11 				# Module version number (for scripting)
-VERSION_DATE 	= "2022/05/19"
+VERSION_NUMBER 	= 1.12 				# Module version number (for scripting)
+VERSION_DATE 	= "2022/06/19"
 VERSION_STRING	= "SMuFF Module V{0} ({1})" # Module version string
 
 WD_TIMEOUT 		= 10.0				# serial watchdog default timeout
@@ -443,7 +443,7 @@ class SMuFF:
 		self._hasWiper 		= config.get("hasWiper", default=T_NO).upper() == T_YES
 		self._dumpRawData 	= config.get("debug", default=T_NO).upper() == T_YES
 		self._reset()
-		
+
 		# register event handlers
 		self._printer.register_event_handler("klippy:disconnect", self.event_disconnect)
 		self._printer.register_event_handler("klippy:connect", self.event_connect)
@@ -463,7 +463,7 @@ class SMuFF:
 		self._feeder 			= False		# status of the Feeder endstop
 		self._feeder2			= False		# status of the 2nd Feeder endstop
 		self._isBusy			= False		# flag set when SMuFF signals "Busy"
-		self._isError			= False		# flag set when SMuFF signals "Error" 
+		self._isError			= False		# flag set when SMuFF signals "Error"
 		self._response			= None		# the response string from SMuFF
 		self._waitRequested		= False 	# set when SMuFF requested a "Wait" (in case of jams or similar)
 		self._abortRequested	= False		# set when SMuFF requested a "Abort"
@@ -471,7 +471,7 @@ class SMuFF:
 		self._isProcessing		= False		# set when SMuFF is supposed to be busy
 		self._isReconnect 	    = False		# set when trying to re-establish serial connection
 		self._isConnected       = False     # set after connection has been established
-		self._autoLoad          = True      # set to load new filament automatically after swapping tools 
+		self._autoLoad          = True      # set to load new filament automatically after swapping tools
 		self._serEvent			= Event()	# event raised when a valid response has been received
 		self._serWdEvent		= Event()	# event raised when status data has been received
 		self._sdcard            = False     # set to True when SD-Card on SMuFF was removed
@@ -485,9 +485,9 @@ class SMuFF:
 		self._stopSerial 		= False		# flag set when the serial reader / connector / watchdog need to be discarded
 		if self._serial:					# pySerial instance
 			self._close_serial()
-		self._sreader 			= None		# serial reader thread instance 
-		self._sconnector		= None		# serial connector thread instance 
-		self._swatchdog			= None		# serial watchdog thread instance 
+		self._sreader 			= None		# serial reader thread instance
+		self._sconnector		= None		# serial connector thread instance
+		self._swatchdog			= None		# serial watchdog thread instance
 		self._jsonCat 			= None		# category of the last JSON string received
 		self._materials 		= []		# Two dimensional array of materials received from the SMuFF after SMUFF_MATERIALS
 		self._swaps 			= []		# One dimensional array of tool swaps received from the SMuFF after SMUFF_SWAPS
@@ -504,7 +504,7 @@ class SMuFF:
 		self._durationTotal 	= 0.0		# duration of all tool changes (for calculating average)
 		self._okTimer 			= None		# (reactor) timer waiting for OK response
 		self._initTimer			= None		# (reactor) timer for _init_SMuFF
-		self._tcTimer 			= None		# (reactor) timer waiting for toolchange to finish 
+		self._tcTimer 			= None		# (reactor) timer waiting for toolchange to finish
 		self._tcState			= 0			# tool change state
 		self._initState			= 0			# state for _init_SMuFF
 		self._lastCmdSent		= None		# GCode of the last command sent to SMuFF
@@ -939,10 +939,10 @@ class SMuFF:
 	#
 	# If tasks run for a long time (such as the tool change), not using
 	# the reactor timer will cause the main process (Klippy) to be blocked
-	# and hence some processes in Klippy will come out of sync. 
+	# and hence some processes in Klippy will come out of sync.
 	# This may mess up the internal handlers and result in some really
 	# strange messages, such as "SD Busy" or shutdown Klipper while
-	# printing. 
+	# printing.
 	# The reactor timer uses a callback and a event time and will
 	# call the method as long as the timer isn't discarded. Returning
 	# the current eventtime with an offset will determine when the next
@@ -954,10 +954,10 @@ class SMuFF:
 	# to finish the tool change and hence it's timing is set to every 2 seconds.
 	#
 	def _tool_change(self, eventtime):
-		
+
 		if self._dumpRawData:
 			self._log.info("Tool change state = {0}".format(self._tcState))
-		
+
 		# state 1: run PRE_TOOLCHANGE macro
 		if self._tcState == 1:
 			self._tcCount +=1
@@ -976,7 +976,7 @@ class SMuFF:
 			else:
 				self._tcState = 2
 			return eventtime + 0.1
-		
+
 		# state 2: send tool change command to SMuFF
 		elif self._tcState == 2:
 			self._lastCmdDone = False
@@ -1033,12 +1033,13 @@ class SMuFF:
 			self._log.info("Tool change took {0} seconds. Average is {1} seconds".format(duration, self._durationTotal / self._tcCount))
 			self._tcState = 0
 			return eventtime + 0.1
-		
+
 		# any other state: discard the timer
 		else:
 			self._reactor.unregister_timer(self._tcTimer)
 			self._tcTimer = None
-	
+			return eventtime
+
 	#
 	# Async load / unload handler
 	#
@@ -1050,6 +1051,7 @@ class SMuFF:
 				self._log.info("waiting done, got OK response")
 			self._reactor.unregister_timer(self._okTimer)
 			self._okTimer = None
+			return eventtime
 		else:
 			self._log.info("waiting for OK response...")
 			return eventtime + 2.0
@@ -1072,18 +1074,18 @@ class SMuFF:
 			# request firmware info from SMuFF
 			if self._isProcessing == False:
 				self._send_SMuFF(FWINFO)
-		elif self._initState == 4: 
+		elif self._initState == 4:
 			# query tool swap configuration settings
 			if self._isProcessing == False:
 				self._send_SMuFF(GETCONFIG.format(CFG_SWAPS))
-		elif self._initState == 5: 
+		elif self._initState == 5:
 			# query some lid servo mapping settings
 			if self._isProcessing == False:
 				self._send_SMuFF(GETCONFIG.format(CFG_SERVOMAPS))
 		else:
 			self._initState = 0
 
-	
+
 	#
 	# helper functions
 	#
@@ -1174,7 +1176,7 @@ class SMuFF:
 				self._log.error("Serial reader isn't alive")
 		except Exception as err:
 			self._log.error("Unable to shut down serial reader thread:\n\t{0}".format(err))
-		
+
 		# discard reader, connector and watchdog threads
 		del(self._sreader)
 		del(self._sconnector)
@@ -1258,7 +1260,7 @@ class SMuFF:
 
 		while 1:
 			if self._isConnected and self._stopSerial == True:
-				break 
+				break
 			if self.cmd_connect(autoConnect=True) == True:
 				break
 			time.sleep(3)
@@ -1304,7 +1306,7 @@ class SMuFF:
 				break
 
 		self._log.info("Shutting down serial watchdog")
-	
+
     #
 	# Tries to reconnect serial port to SMuFF
     #
@@ -1365,7 +1367,7 @@ class SMuFF:
 		else:
 			timeout = self._cmdTimeout	# wait max. 25 seconds for other operations
 			tmName = "command"
-		self._wdTimeout = timeout			
+		self._wdTimeout = timeout
 		done = False
 		result = None
 
@@ -1440,7 +1442,7 @@ class SMuFF:
 
     #
     # Parses a JSON response sent by the SMuFF (used for retrieving SMuFF settings)
-    #  
+    #
 	def _parse_json(self, data, category):
 		if category == None or data == None:
 			return
@@ -1468,7 +1470,7 @@ class SMuFF:
 				# TMC driver configuration
 				if category == C_TMC:
 					pass
-				
+
 				# materials configuration
 				if category == C_MATERIALS:
 					try:
@@ -1480,7 +1482,7 @@ class SMuFF:
 							#resp += "Tool {0} is '{2} {1}' with a purge factor of {3}%\n".format(i, material[0], material[1], material[2])
 					except Exception as err:
 						self._log.error("Parsing materials has thrown an exception:\n\t{0}".format(err))
-				
+
 				# tool swapping configuration
 				if category == C_SWAPS:
 					try:
@@ -1492,7 +1494,7 @@ class SMuFF:
 							#resp += "Tool {0} is assigned to tray {1}\n".format(i, swap)
 					except Exception as err:
 						self._log.error("Parsing tool swaps has thrown an exception:\n\t{0}".format(err))
-				
+
 				# servo mapping configuration
 				if category == C_SERVOMAPS:
 					try:
@@ -1516,7 +1518,7 @@ class SMuFF:
 							#resp += "Tool load state {0}\n".format(i, feedState)
 					except Exception as err:
 						self._log.error("Parsing feed states has thrown an exception:\n\t{0}".format(err))
-				
+
 				if len(resp):
 					try:
 						self.gcode.respond_info(resp)
@@ -1528,13 +1530,13 @@ class SMuFF:
 
     #
     # Parses the states periodically sent by the SMuFF
-    #  
+    #
 	def _parse_states(self, states):
 		#self._log.info("States received: [" + states + "]")
 		if len(states) == 0:
 			return False
 
-		# Note: SMuFF sends periodically states in this notation: 
+		# Note: SMuFF sends periodically states in this notation:
 		# 	"echo: states: T: T4  S: off  R: off  F: off  F2: off  TMC: -off  SD: off  SC: off  LID: off  I: off  SPL: 0"
 		for m in re.findall(r'([A-Z]{1,3}[\d|:]+).(\+?\w+|-?\d+|\-\w+)+',states):
 			if   m[0] == "T:":                          # current tool
@@ -1659,7 +1661,7 @@ class SMuFF:
 				tool = self._parse_tool_number(data[10:])
 				# only if the printer isn't printing
 				if self._is_printing() == False:
-					# query the heater 
+					# query the heater
 					heater = self._printer.lookup_object("heater")
 					try:
 						if heater.extruder.can_extrude:
@@ -1728,9 +1730,9 @@ class SMuFF:
 			else:
 				if self._dumpRawData:
 					self._log.info("[OK->] LastCommand '{0}'   LastResponse {1}".format(self._lastCmdSent, pformat(self._lastResponse)))
-				
+
 				firstResponse = self._lastResponse[0].rstrip("\n") if len(self._lastResponse) else None
-				
+
 				if self._lastCmdSent == ANY:
 					self._lastCmdDone = True
 				elif firstResponse != None:
@@ -1751,14 +1753,14 @@ class SMuFF:
 		self._log.debug("Last response received: [{0}]".format(self._lastResponse[len(self._lastResponse)-1]))
 
 	#
-	# Helper function to retrieve time in milliseconds 
+	# Helper function to retrieve time in milliseconds
 	#
 	def _nowMS(self):
 		return int(round(time.time() * 1000))
 
 #
 # Main entry point; Creates a new instance of this module.
-#  
+#
 def load_config(config):
 	logger = SLogger("SMuFF: {0}")
 
