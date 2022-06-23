@@ -1,0 +1,69 @@
+#!/bin/bash
+KLIPPER_PATH="${HOME}/klipper"
+KLIPPER_CONFIG_PATH="${KLIPPER_PATH}_config"
+
+# Step 1: link extension to Klipper
+link_extension()
+{
+    echo "Linking SMuFF extension to Klipper..."
+    ln -sf "${SRCDIR}/smuff.py" "${KLIPPER_PATH}/klippy/extras/smuff.py"
+    chmod 644 "${SRCDIR}/smuff.py"
+}
+
+# Step 2: copy config file(s)
+copy_configs()
+{
+    if [ -e "${KLIPPER_CONFIG_PATH}/smuff.cfg" ]; then
+        echo "File 'smuff.cfg' already exists! Please update it's content manually if needed."
+    else
+        echo "Copying smuff.cfg to Klipper..."
+        cp "${SRCDIR}/smuff.cfg" "${KLIPPER_CONFIG_PATH}/"
+    fi
+    if [ -e "${KLIPPER_CONFIG_PATH}/smuff_menu.cfg" ]; then
+        echo "File 'smuff_menu.cfg' already exists! Please update it's content manually if needed."
+    else
+        echo "Copying smuff_menu.cfg to Klipper..."
+        cp "${SRCDIR}/smuff_menu.cfg" "${KLIPPER_CONFIG_PATH}/"
+    fi
+    if [ -e "${KLIPPER_CONFIG_PATH}/smuff_runout.cfg" ]; then
+        echo "File 'smuff_runout.cfg' already exists! Please update it's content manually if needed."
+    else
+        echo "Copying smuff_runout.cfg to Klipper..."
+        cp "${SRCDIR}/smuff_runout.cfg" "${KLIPPER_CONFIG_PATH}/"
+    fi
+}
+
+# Step 3: restarting Klipper
+restart_klipper()
+{
+    echo "Restarting Klipper..."
+    sudo systemctl restart klipper
+}
+
+# Helper functions
+verify_ready()
+{
+    if [ "$EUID" -eq 0 ]; then
+        echo "This script must not run as root"
+        exit -1
+    fi
+}
+
+# Force script to exit if an error occurs
+set -e
+
+# Find SRCDIR from the pathname of this script
+SRCDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Parse command line arguments
+while getopts "k:" arg; do
+    case $arg in
+        k) KLIPPER_PATH=$OPTARG;;
+    esac
+done
+
+# Run steps
+verify_ready
+link_extension
+copy_configs
+restart_klipper

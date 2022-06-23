@@ -79,6 +79,7 @@
 #   autoConnectSerial=yes
 #   commandTimeout=25
 #   toolchangeTimeout=90
+#	watchdogTimeout=30
 #   autoLoad=yes
 #	hasCutter=yes
 #	hasWiper=no
@@ -179,11 +180,9 @@ except ImportError:
 from threading import Thread, Event
 from pprint import pformat
 
-VERSION_NUMBER 	= 1.12 				# Module version number (for scripting)
-VERSION_DATE 	= "2022/06/19"
+VERSION_NUMBER 	= 1.13 				# Module version number (for scripting)
+VERSION_DATE 	= "2022/06/22"
 VERSION_STRING	= "SMuFF Module V{0} ({1})" # Module version string
-
-WD_TIMEOUT 		= 10.0				# serial watchdog default timeout
 
 FWINFO		= "M115"        		# SMuFF GCode to query firmware info
 PERSTATE    = "M155"     			# SMuFF GCode for enabling sending periodical states
@@ -438,7 +437,7 @@ class SMuFF:
 		self._cmdTimeout	= config.getfloat("commandTimeout", default=20.0)
 		self._tcTimeout		= config.getfloat("toolchangeTimeout", default=90.0)
 		self.autoConnect	= config.get("autoConnectSerial", default=T_YES).upper() == T_YES
-		self._autoLoad		= config.get("autoLoad", default=T_YES).upper() == T_YES
+		#self._autoLoad		= config.get("autoLoad", default=T_YES).upper() == T_YES
 		self._hasCutter		= config.get("hasCutter", default=T_YES).upper() == T_YES 		# will be eventually overwritten by the SMuFF config
 		self._hasWiper 		= config.get("hasWiper", default=T_NO).upper() == T_YES
 		self._dumpRawData 	= config.get("debug", default=T_NO).upper() == T_YES
@@ -450,7 +449,8 @@ class SMuFF:
 		self._printer.register_event_handler("klippy:ready", self.event_ready)
 
 		#set initial watchdog timeout
-		self._wdTimeout = WD_TIMEOUT * 2	# default serial watchdog timeout
+		self._wdTimeoutDef  = config.getfloat("watchdogTimeout", default=30)
+		self._wdTimeout 	= self._wdTimeoutDef	# default serial watchdog timeout
 
 	def _reset(self):
 		self._log.info("Resetting module")
@@ -512,6 +512,7 @@ class SMuFF:
 		self._loadState 		= 0			# load state of the current tool
 		self._isDDE 			= False		# flag whether the SMuFF is configured for DDE
 		self._hasSplitter 		= False		# flag whether the SMuFF is configured for the Splitter option
+		self._wdTimeoutDef 		= 0 		# default timeout for the serial port watchdog in seconds
 
     #
     # Klippy disconnect handler
@@ -737,7 +738,7 @@ class SMuFF:
 			return
 		if gcode.upper() == RESET:
 			self._serWdEvent.set()
-			self._wdTimeout = WD_TIMEOUT*2
+			self._wdTimeout = self._wdTimeoutDef
 			self._send_SMuFF(gcode)
 		else:
 			response = self._send_SMuFF_and_wait(gcode)
@@ -998,6 +999,7 @@ class SMuFF:
 					self._tcState = 4
 				return eventtime + 0.1
 			else:
+				self._serWdEvent.set()
 				watchdog = (self._nowMS()-self._tcStartTime)/1000
 				# task already running longer than expected, interrupt it
 				# otherwise it'd run infinitly
@@ -1054,6 +1056,7 @@ class SMuFF:
 			return eventtime
 		else:
 			self._log.info("waiting for OK response...")
+			self._serWdEvent.set()
 			return eventtime + 2.0
 
 	#
@@ -1341,6 +1344,10 @@ class SMuFF:
 			else:
 				self._lastCmdSent = elements
 
+		if self._lastCmdSent == RESET:
+			# don't log REST
+			self._lastCmdSent = None
+
 		if self._serial and self._serial.is_open:
 			try:
 				b = bytearray(len(data)+2)
@@ -1395,7 +1402,7 @@ class SMuFF:
 					self._set_processing(False)
 
 		self._set_processing(False)	# SMuFF is not supposed to do anything
-		self._wdTimeout = WD_TIMEOUT
+		self._wdTimeout = self._wdTimeoutDef
 		return result
 
 	#
@@ -1429,7 +1436,10 @@ class SMuFF:
 	#
 	def _set_response(self, response):
 		if not response == None:
-			self._response = response.rstrip("\n")
+			if response.rstrip("\n") == RESET:
+				self._response = ""
+			else:
+				self._response = response.rstrip("\n")
 		else:
 			self._response = ""
 		self._lastResponse = []
@@ -1462,6 +1472,7 @@ class SMuFF:
 					self._hasCutter 	= cfg["UseCutter"]
 					self._hasSplitter 	= cfg["UseSplitter"]
 					self._isDDE 		= cfg["UseDDE"]
+					self._initState += 1
 
 				# stepper configuration
 				if category == C_STEPPERS:
@@ -1480,6 +1491,7 @@ class SMuFF:
 							material = [ cfg[t]["Material"], cfg[t]["Color"], cfg[t]["PFactor"] ]
 							self._materials.append(material)
 							#resp += "Tool {0} is '{2} {1}' with a purge factor of {3}%\n".format(i, material[0], material[1], material[2])
+						self._initState += 1
 					except Exception as err:
 						self._log.error("Parsing materials has thrown an exception:\n\t{0}".format(err))
 
@@ -1492,6 +1504,7 @@ class SMuFF:
 							swap = cfg[t]
 							self._swaps.append(swap)
 							#resp += "Tool {0} is assigned to tray {1}\n".format(i, swap)
+						self._initState += 1
 					except Exception as err:
 						self._log.error("Parsing tool swaps has thrown an exception:\n\t{0}".format(err))
 
@@ -1504,6 +1517,7 @@ class SMuFF:
 							servoMap = cfg[t]["Close"]
 							self._servoMaps.append(servoMap)
 							#resp += "Tool {0} closed @ {1} deg.\n".format(i, servoMap)
+						self._initState += 1
 					except Exception as err:
 						self._log.error("Parsing lid mappings has thrown an exception:\n\t{0}".format(err))
 
@@ -1703,7 +1717,6 @@ class SMuFF:
 		if data.startswith(R_JSON):
 			self._parse_json(data, self._jsonCat)
 			self._jsonCat = None
-			self._initState += 1
 			return
 
 		if data.startswith(R_FWINFO):

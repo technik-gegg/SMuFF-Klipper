@@ -1,0 +1,10 @@
+#
+# Add these lines to your existion moonraker.conf
+#
+[update_manager SMuFF]
+type: git_repo
+path: ~/SMuFF-Klipper
+origin: https://github.com/technik-gegg/SMuFF-Klipper.git
+install_script: install-smuff.sh
+info_tags:
+    desc=Module for controlling the SMuFF via UART-Serial from Klipper

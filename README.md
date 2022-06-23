@@ -4,8 +4,7 @@
 
 This is a module (plugin) for Klipper which handles tool changes on the [SMuFF](https://sites.google.com/view/the-smuff).
 
-This version implements the following GCodes, which can be accessed from
-the Klipper console:
+This version implements the following (pseudo) GCodes, which can be accessed from the Klipper console:
 
 | GCode | Description |
 |-------|-------------|
@@ -82,17 +81,25 @@ You'll need to access those only if you're about to extend the SMuFF-Klipper mod
 ## Setup
 
 Please visit [this webpage](https://sites.google.com/view/the-smuff/how-to/configure/the-klipper-module) to see the steps that are necessary to install it.
-It's a pretty simple and stright forward process, which is mostly accomplished by copying a couple of files.
+It's a pretty simple and straight forward process, which is accomplished by using the installation script.
 
-To get the files on your target Raspberry Pi, it's recommended using the following commands in a SSH session:
+For the very first install, open a SSH session on your Raspberry Pi and execute the following commands:
 
 ```sh
     cd ~
-    git clone https://github.com/technik-gegg/SMuFF-Klipper
+    git clone https://github.com/technik-gegg/SMuFF-Klipper.git
     cd SMuFF-Klipper
+    ./install-smuff.sh
 ```
 
-After that, simply copy the files into their destination folder.
+In order to get the SMuFF module updated automatically as I release new versions, it's recommended using the *Moonraker Update Manager* by adding the contents of *moonraker_update_manager.txt* from this repository to your **moonraker.conf** file.
+
+>**Please notice:**
+>
+>*The configuration files won't be copied if they already exist within the klipper_config folder to prevent overwriting your existing settings on an update!
+Hence, if changes within the config files need to be applied, you have to apply them manually. Always check the **Recent Changes** section to see whether you need to apply changes for an updated version.*
+
+---
 
 All the basic settings for the module are located in the **smuff.cfg** file, which eventually has to be included in your **printer.cfg** file. The settings shown in the example below reflect the standard configuration. The only modification you may need to make are for *commandTimeout* and *toolchangeTimeout*. Those depend on the environment your SMuFF is running in.
 
@@ -105,7 +112,7 @@ serialTimeout=10
 autoConnectSerial=yes
 commandTimeout=25
 toolchangeTimeout=90
-autoload=yes
+watchdogTimeout=30
 hasCutter=yes
 hasWiper=no
 debug=no
@@ -119,20 +126,30 @@ The latter option **debug** is set to *no* by default. Set this to *yes* if you 
 If you run into some issues / strange behaviours when connecting the SMuFF to Klipper, you have to look into the Klipper logfile to fully understand what's going on. The easiest way to do so it to open a SSH connection to your Raspberry Pi and launch the following command:
 
 ```sh
-tail -f /home/pi/klipper_logs/klippy.log | grep -A5 "SMuFF" || "Trace"
+tail -f ~/klipper_logs/klippy.log | grep -A5 "SMuFF" || "Trace"
 ```
 
 This way only SMuFF related logs and Tracebacks (Exceptions) are being shown continously. It helped me a lot while developing the module, so it might be helpful for you too.
 *For tracebacks you may have to modify the -A parameter and nudge up the number to see the full trace.*
 
-***
+---
 
 ## Recent changes
+
+**V1.13** - Added watchdogTimeout setting to smuff.cfg
+
+- added a new timeout value for the serial port watchdog to *smuff.cfg*, since the existing timeout triggered to soon on some machines that need longer to accomplish a tool load/unload/change operation.
+**Please add that setting to your existing *smuff.cfg*** with an initial value of **30** (seconds)
+If you still run into these kind of issues, increase this timeout value in steps of 10
+- removed **autoLoad** flag from  *smuff.cfg*. Setting this value to *False* doesn't make much sense in a tool change operation
+**Please remove that setting from your existing *smuff.cfg* otherwise you'll get an error on startup**
+- restructured this Github repository for easier handling from Update Manager
+- added the **Moonraker Update Manager** configuration for automatic updates on future releases. See *moonraker_update_manager.txt*
 
 **V1.12** - Added smuff_runout.cfg / Potential bugfix
 
 - added **smuff_runout.cfg**. This macro **may** be used to swap tools sequentially if a runout sensor triggers.
-**The thought behind is:** If your runout sensor triggers, the script will determine the next (logical) tool (i.e. activetool + 1) and switch to it. This would allow for continous printing on huge models which may reqiure more than one spool of filament to complete.
+**The thought behind is:** If your runout sensor triggers, the script will determine the next (logical) tool (i.e. activetool + 1) and switch to it. This will allow for continous printing on huge models which may reqiure more than one spool of filament to complete.
 **Please notice:** This macro hasn't been tested yet and it'll require that you configure your runout sensor accordingly. If you'd like to use this script, simply add an include in your *printer.cfg*.
 - added a return value (eventtime) after reactor timers have been disposed, just in case Klipper is trying to evaluate the return value, which seems to be the case with the latest  version
 
