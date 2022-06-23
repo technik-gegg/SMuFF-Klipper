@@ -100,6 +100,13 @@ In order to get the SMuFF module updated automatically as I release new versions
 >*The configuration files won't be copied if they already exist within the klipper_config folder to prevent overwriting your existing settings on an update!
 Hence, if changes within the config files need to be applied, you have to apply them manually. Always check the **Recent Changes** section to see whether you need to apply changes for an updated version.*
 
+>**Also keep in mind:**
+If the Update Manager shows you a warning/error for the SMuFF module, try a hard-reset first. If the error says the repository is not being "pristine", add the **enable_repo_debug** setting to the update_manager section in *moonraker.conf* and set it to True, i.e.:
+>
+>[update_manager]
+refresh_interval: ...
+enable_repo_debug: True
+
 ---
 
 All the basic settings for the module are located in the **smuff.cfg** file, which eventually has to be included in your **printer.cfg** file. The settings shown in the example below reflect the standard configuration. The only modification you may need to make are for *commandTimeout* and *toolchangeTimeout*. Those depend on the environment your SMuFF is running in.
