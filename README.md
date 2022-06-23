@@ -89,6 +89,7 @@ For the very first install, open a SSH session on your Raspberry Pi and execute 
     cd ~
     git clone https://github.com/technik-gegg/SMuFF-Klipper.git
     cd SMuFF-Klipper
+    chmod 755 install-smuff.sh
     ./install-smuff.sh
 ```
 
