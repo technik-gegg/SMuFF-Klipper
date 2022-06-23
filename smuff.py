@@ -1085,6 +1085,9 @@ class SMuFF:
 			# query some lid servo mapping settings
 			if self._isProcessing == False:
 				self._send_SMuFF(GETCONFIG.format(CFG_SERVOMAPS))
+		elif self._initState == 6:
+			self._log.info("_async_init done")
+			self._initState = 0
 		else:
 			self._initState = 0
 
@@ -1745,6 +1748,10 @@ class SMuFF:
 					self._log.info("[OK->] LastCommand '{0}'   LastResponse {1}".format(self._lastCmdSent, pformat(self._lastResponse)))
 
 				firstResponse = self._lastResponse[0].rstrip("\n") if len(self._lastResponse) else None
+
+				if firstResponse == RESET:
+					firstResponse = None
+					self._lastCmdDone = True
 
 				if self._lastCmdSent == ANY:
 					self._lastCmdDone = True
