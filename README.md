@@ -31,6 +31,7 @@ This version implements the following (pseudo) GCodes, which can be accessed fro
 | SMUFF_RESET | Restarts the SMuFF |
 | SMUFF_VERSION | Query the SMuFF module version |
 | SMUFF_RESET_AVG | Reset tool change statistics |
+| SMUFF_DEBUG | Toggles between normal and debug mode (i.e. more printouts to the logfile) |
 
 Most macros don't require any parameter, except these macros:
 | GCode | Parameter(s) | Type | Description |
@@ -138,11 +139,16 @@ tail -f ~/klipper_logs/klippy.log | grep -A5 "SMuFF" || "Trace"
 ```
 
 This way only SMuFF related logs and Tracebacks (Exceptions) are being shown continously. It helped me a lot while developing the module, so it might be helpful for you too.
-*For tracebacks you may have to modify the -A parameter and nudge up the number to see the full trace.*
+*For tracebacks you may have to adjust the -A parameter and nudge up the number to see the full trace.*
 
 ---
 
 ## Recent changes
+
+**V1.14** - Updated for the latest Klipper version
+
+- changed installer to support the new multi-printer environment. By default, i.e. for a single printer, files are going to be installed in the **~/printer_data/config** folder. Though, the installer will ask you politely, if that's what you want. *On older Klipper installations, the installation behaviour will not change.*
+- updated module *smuff.py* to utilize the *smuff_core.py* module, which encapsules the whole SMuFF logic and is the same code as for my OctoPrint plugin.
 
 **V1.13** - Added watchdogTimeout setting to smuff.cfg
 
