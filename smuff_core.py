@@ -279,6 +279,7 @@ class SmuffCore():
 		self.feedStates			= [] 		# One dimensional array the feed state for each tool
 		self.relay 				= None 		# state of the relay E(xternal) or I(nternal)
 		self.isJammed 			= False 	# flag set when feeder is jammed
+		self.ignoreDebug		= True 		# ignore any debug messages coming from SMuFF
 
 		self._serial			= None      # serial instance
 		self._lastSerialEvent	= 0 		# last time (in millis) a serial receive took place
@@ -364,26 +365,26 @@ class SmuffCore():
 				self._responseCB(T_NO_PARAM.format(P_TOOL_L))
 			return
 		# retrieve current and pending tool
-		self._activeTool = self.parse_tool_number(self.curTool)
-		self._pendingTool = gcmd.get_int(P_TOOL_S, default=-1)
-		if self._pendingTool == -1:
-			self._pendingTool = gcmd.get_int(P_TOOL_L, default=-1)
-			if self._pendingTool == -1:
+		self._activeTool = self.get_active_tool()
+		self.pendingTool = gcmd.get_int(P_TOOL_S, default=-1)
+		if self.pendingTool == -1:
+			self.pendingTool = gcmd.get_int(P_TOOL_L, default=-1)
+			if self.pendingTool == -1:
 				if self._responseCB:
 					self._responseCB(T_NO_PARAM.format(P_TOOL_L))
 				return
 		# check pending tool for validity
-		if self._pendingTool > self.toolCount:
+		if self.pendingTool > self.toolCount:
 			if self._responseCB:
-				self._responseCB(T_NO_SEL_TOOL.format(self._pendingTool, self.toolCount))
-			self._pendingTool = -1
+				self._responseCB(T_NO_SEL_TOOL.format(self.pendingTool, self.toolCount))
+			self.pendingTool = -1
 			return
 
 		# no tool change needed as we already have the right tool selected
-		if self._activeTool == self._pendingTool:
+		if self._activeTool == self.pendingTool:
 			self._log.info("No tool change needed, skipping...")
 			if self._responseCB:
-				self._responseCB(T_SKIP_TOOL.format(self._pendingTool))
+				self._responseCB(T_SKIP_TOOL.format(self.pendingTool))
 		else:
 			# need to change tool, setup async function
 			if self._tcTimer is None:
@@ -421,7 +422,7 @@ class SmuffCore():
 		# state 1: run PRE_TOOLCHANGE macro
 		if self._tcState == 1:
 			self.start_tc_timer()
-			self._preTool = self.curTool
+			self.preTool = self.curTool
 
 			if self._is_printing():
 				# run PRE_TOOLCHANGE gcode macro
@@ -476,7 +477,7 @@ class SmuffCore():
 		# state 5: run POST_TOOLCHANGE macro
 		elif self._tcState == 5:
 			if self._is_print_paused():
-				prevTool = self.parse_tool_number(self._preTool)
+				prevTool = self.parse_tool_number(self.preTool)
 				# run POST_TOOLCHANGE gcode macro
 				self._log.info("Executing script {0}".format(G_POST_TC.format(prevTool, self._activeTool)))
 				try:
@@ -729,7 +730,7 @@ class SmuffCore():
 			if self.connect_SMuFF == True:
 				break
 			time.sleep(3)
-			self._log.info("Serial connector looping...")
+			#self._log.info("Serial connector looping...")
 
 		# as soon as the connection has been established, cancel the connector thread
 		self._log.info("Shutting down serial connector")
@@ -1118,17 +1119,18 @@ class SmuffCore():
 			# don't process any general debug messages
 			index = len(R_ECHO)+1
 			if data[index:].startswith(R_DEBUG):
-				err = "SMuFF has sent a debug response: [{0}]".format(data.rstrip())
-				self._log.debug(err)
-				# filter out ESC sequences
-				match = re.sub(r'\033\[\d+m', '', err)
-				if match != None:
-					err = match
-				if self._isKlipper:
-					self.gcode.respond_info(err)
-				else:
-					if not self._responseCB == None:
-						self._responseCB(err)
+				if not self.ignoreDebug:
+					err = "SMuFF has sent a debug response: [{0}]".format(data.rstrip())
+					self._log.debug(err)
+					# filter out ESC sequences
+					match = re.sub(r'\033\[\d+m', '', err)
+					if match != None:
+						err = match
+					if self._isKlipper:
+						self.gcode.respond_info(err)
+					else:
+						if not self._responseCB == None:
+							self._responseCB(err)
 			# but do process the tool/endstop states
 			elif data[index:].startswith(R_STATES):
 				self._parse_states(data.rstrip())

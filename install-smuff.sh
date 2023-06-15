@@ -1,5 +1,4 @@
 #!/bin/bash
-
 #----------------------------------------------
 # SMuFF on Klipper installation script
 #----------------------------------------------
@@ -22,7 +21,7 @@ SYMLINK="${KLIPPER_PATH}/klippy/extras/"                    # symlink folder
 
 UPDATE_INFO="already exists! Please update its contents manually if needed."
 
-# Some colors for highlighting
+# Some colors for highlighting text
 WHITE='\e[0;37m'
 CYAN='\e[1;36m'
 RED='\e[1;31m'
@@ -36,10 +35,10 @@ parse_instances()
     instances=()
     ndx=1
     default=0
-    for entry in $(ls -d *_data/ | cut -f1 -d'/') ; do
+    for entry in $(ls -d ../*_data/ | cut -f2 -d'/') ; do
         printf "${CYAN}%d: %s${WHITE}\n" $ndx $entry
         instances+=($entry)
-        if [[ $entry == $DEFAULT_INSTANCE ]] ; then
+        if [ $entry == $DEFAULT_INSTANCE ] ; then
             default=$ndx
         fi
         ((ndx+=1))
@@ -50,7 +49,7 @@ parse_instances()
         printf "\n"
         read -e -p "Enter the instance number in which to install SMuFF: " -i "${default}" instance
 
-        if [[ $instance > 0 && $instance < $ndx ]] ; then
+        if [ $instance > 0 && $instance < $ndx ] ; then
             KLIPPER_CONFIG_PATH="${HOME_PATH}/${instances[$instance-1]}/config"
             MOONRAKER_CONFIG="${KLIPPER_CONFIG_PATH}/moonraker.conf"
             break
@@ -70,7 +69,7 @@ query_instance()
             parse_instances
             printf  "\nSMuFF files will be installed in folder: ${GREEN}%s${WHITE}.\n" ${KLIPPER_CONFIG_PATH}
             read -e -p "Is this correct (y/n)? " -i "y" answer
-            if [[ $answer == "Y" ]] || [[ $answer == "y" ]] ; then
+            if [ $answer == "Y" ] || [ $answer == "y" ] ; then
                 echo -e "${GREEN}Ok.${WHITE}"
                 break
             fi
@@ -82,7 +81,7 @@ query_instance()
 link_extensions()
 {
     for mod in ${MODULES[@]} ; do
-        if [ ! -L ${SYMLINK}${mod} ] && [ -e ${SYMLINK}${mod} ] ; then
+        if [ ! -L ${SYMLINK}${mod} ] && [ -e ${SYMLINK} ] ; then
             echo "Creating symlink for file ${mod} in ${SYMLINK} ..."
             ln -sf "${SRCDIR}/${mod}" "${SYMLINK}${mod}"
         else
@@ -101,6 +100,7 @@ copy_configs()
         else
             echo "Copying ${SRCDIR}/${cfg} to ${KLIPPER_CONFIG_PATH}/${cfg} ..."
             cp "${SRCDIR}/${cfg}" "${KLIPPER_CONFIG_PATH}/"
+            chmod 755 "${KLIPPER_CONFIG_PATH}/${cfg}"
         fi
     done
 }
@@ -115,7 +115,7 @@ add_updater()
             echo "${line}" >> "${MOONRAKER_CONFIG}"
         done < "${SRCDIR}/moonraker_update_manager.txt"
     else
-        echo "SMuFF update manager section ${UPDATE_INFO}"
+        echo -e "${RED}SMuFF update manager section ${UPDATE_INFO}${WHITE}"
     fi
 }
 

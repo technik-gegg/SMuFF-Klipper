@@ -7,6 +7,5 @@ primary_branch: main
 install_script: install-smuff.sh
 is_system_service: False
 managed_services: klipper
-info_tags:
-    desc=Module for controlling the SMuFF via UART-Serial from Klipper
+info_tags: desc=Module for controlling the SMuFF via UART-Serial from Klipper
 

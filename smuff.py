@@ -209,6 +209,7 @@ class SMuFF:
 
 
 		# get configuration
+		self._ignoreDebug = config.get("ignoreDebug", default=smuff_core.T_NO).upper() == smuff_core.T_YES
 		self._hasIDEX = config.get("hasIDEX", default=smuff_core.T_NO).upper() == smuff_core.T_YES
 		serialPort = config.get("serial")
 		if not serialPort:
@@ -223,6 +224,7 @@ class SMuFF:
 		self.SCA.hasWiper 		= config.get("hasWiper", default=smuff_core.T_NO).upper() == smuff_core.T_YES
 		self.SCA.dumpRawData 	= config.get("debug", default=smuff_core.T_NO).upper() == smuff_core.T_YES
 		self.SCA.wdTimeout 		= config.getfloat("watchdogTimeout", default=60)
+		self.SCA.ignoreDebug 	= self._ignoreDebug
 
 		# 2nd serial port gets only handled if hasIDEX is set
 		serialPortB = config.get("serialB")
@@ -235,8 +237,9 @@ class SMuFF:
 			self.SCB.autoConnect	= config.get("autoConnectSerialB", default=smuff_core.T_YES).upper() == smuff_core.T_YES
 			self.SCB.hasCutter		= config.get("hasCutterB", default=smuff_core.T_YES).upper() == smuff_core.T_YES 		# will be eventually overwritten by the SMuFF config
 			self.SCB.hasWiper 		= config.get("hasWiperB", default=smuff_core.T_NO).upper() == smuff_core.T_YES
-			self.SCB.dumpRawData 	= config.get("debug", default=smuff_core.T_NO).upper() == smuff_core.T_YES
+			self.SCB.dumpRawData 	= self.SCA.dumpRawData
 			self.SCB.wdTimeout 		= config.getfloat("watchdogTimeoutB", default=60)
+			self.SCB.ignoreDebug 	= self._ignoreDebug
 
 		# register event handlers
 		self._printer.register_event_handler("klippy:disconnect", self.event_disconnect)
@@ -283,11 +286,11 @@ class SMuFF:
 		pass
 
 	def smuffStatusCallbackA(self, active):
-		self._log.info("[ A ]  isActive {0}".format(active))
+		# self._log.info("[ A ]  isActive {0}".format(active))
 		pass
 
 	def smuffStatusCallbackB(self, active):
-		self._log.info("[ B ]  isActive {0}".format(active))
+		# self._log.info("[ B ]  isActive {0}".format(active))
 		pass
 
 	def smuffResponseCallbackA(self, message):
