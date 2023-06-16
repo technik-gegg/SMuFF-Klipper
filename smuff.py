@@ -201,6 +201,8 @@ class SMuFF:
 		self._reactor 		= self._printer.get_reactor()
 		self.gcode 			= self._printer.lookup_object("gcode")
 		self._okTimer 		= None		# (reactor) timer waiting for OK response
+		self._lastActiveA 	= False
+		self._lastActiveB 	= False
 
 		try:
 			self.pause_resume = self._printer.load_object(config, "pause_resume")
@@ -227,21 +229,22 @@ class SMuFF:
 		self.SCA.ignoreDebug 	= self._ignoreDebug
 
 		# 2nd serial port gets only handled if hasIDEX is set
-		serialPortB = config.get("serialB")
-		if serialPortB and self._hasIDEX:
-			self.SCB.serialPort 	= serialPortB
-			self.SCB.baudrate		= config.getint("baudrateB", default=115200)
-			self.SCB.timeout		= config.getfloat("serialTimeoutB", default=5.0)
-			self.SCB.cmdTimeout		= config.getfloat("commandTimeoutB", default=20.0)
-			self.SCB.tcTimeout		= config.getfloat("toolchangeTimeoutB", default=90.0)
-			self.SCB.autoConnect	= config.get("autoConnectSerialB", default=smuff_core.T_YES).upper() == smuff_core.T_YES
-			self.SCB.hasCutter		= config.get("hasCutterB", default=smuff_core.T_YES).upper() == smuff_core.T_YES 		# will be eventually overwritten by the SMuFF config
-			self.SCB.hasWiper 		= config.get("hasWiperB", default=smuff_core.T_NO).upper() == smuff_core.T_YES
-			self.SCB.dumpRawData 	= self.SCA.dumpRawData
-			self.SCB.wdTimeout 		= config.getfloat("watchdogTimeoutB", default=60)
-			self.SCB.ignoreDebug 	= self._ignoreDebug
+		if self._hasIDEX:
+			serialPortB = config.get("serialB")
+			if serialPortB:
+				self.SCB.serialPort 	= serialPortB
+				self.SCB.baudrate		= config.getint("baudrateB", default=115200)
+				self.SCB.timeout		= config.getfloat("serialTimeoutB", default=5.0)
+				self.SCB.cmdTimeout		= config.getfloat("commandTimeoutB", default=20.0)
+				self.SCB.tcTimeout		= config.getfloat("toolchangeTimeoutB", default=90.0)
+				self.SCB.autoConnect	= config.get("autoConnectSerialB", default=smuff_core.T_YES).upper() == smuff_core.T_YES
+				self.SCB.hasCutter		= config.get("hasCutterB", default=smuff_core.T_YES).upper() == smuff_core.T_YES 		# will be eventually overwritten by the SMuFF config
+				self.SCB.hasWiper 		= config.get("hasWiperB", default=smuff_core.T_NO).upper() == smuff_core.T_YES
+				self.SCB.dumpRawData 	= self.SCA.dumpRawData
+				self.SCB.wdTimeout 		= config.getfloat("watchdogTimeoutB", default=60)
+				self.SCB.ignoreDebug 	= self._ignoreDebug
 
-		# register event handlers
+		# register Klipper event handlers
 		self._printer.register_event_handler("klippy:disconnect", self.event_disconnect)
 		self._printer.register_event_handler("klippy:connect", self.event_connect)
 		self._printer.register_event_handler("klippy:ready", self.event_ready)
@@ -274,6 +277,7 @@ class SMuFF:
 		self.gcode.register_command("SMUFF_DUMP_RAW",		self.cmd_dump_raw, 		smuff_core.T_HELP_DUMP_RAW)
 		self.gcode.register_command("SMUFF_DEBUG",			self.cmd_dump_raw, 		smuff_core.T_HELP_DUMP_RAW)
 		self.gcode.register_command("SMUFF_INSTANCE",		self.cmd_instance, 		smuff_core.T_HELP_INSTANCE)
+		self.gcode.register_command("SMUFF_GETINSTANCE",	self.cmd_getinstance, 	smuff_core.T_HELP_GETINSTANCE)
 		self.gcode.register_command("SMUFF_TEST",			self.cmd_test, 			"")
 
 	def autoConnect(self):
@@ -283,15 +287,20 @@ class SMuFF:
 		if self._hasIDEX and self.SCB.autoConnect:
 			self._log.info("Auto connecting SMuFF B...")
 			self.SCB.connect_SMuFF()
-		pass
 
 	def smuffStatusCallbackA(self, active):
-		# self._log.info("[ A ]  isActive {0}".format(active))
-		pass
+		if self._lastActiveA != active:
+			self._log.info("[ A ]  active state switched from {0} to {1}".format(self._lastActiveA, active))
+			self._lastActiveA = active
+			if active == False:
+				self._setResponse("Serial reader has shut down", False, self.SCA)
 
 	def smuffStatusCallbackB(self, active):
-		# self._log.info("[ B ]  isActive {0}".format(active))
-		pass
+		if self._lastActiveB != active:
+			self._log.info("[ B ]  active state switched from {0} to {1}".format(self._lastActiveB, active))
+			self._lastActiveB = active
+			if active == False:
+				self._setResponse("Serial reader has shut down", False, self.SCB)
 
 	def smuffResponseCallbackA(self, message):
 		self._setResponse(message, False, self.SCA)
@@ -345,15 +354,20 @@ class SMuFF:
 			self._log.info("gcode_macro '{0}' check OK".format(smuff_core.POST_TC))
 
 
-	def get_instance(self):
+	def get_instance(self, gcmd=None):
+		if gcmd:
+			device = gcmd.get(smuff_core.P_DEVICE, default="").upper()
+			if device == "A" or device == "B":
+				self._activeInstance = device
+			else:
+				self.gcode.respond_info(smuff_core.T_INVALID_DEVICE)
 		self._instance = self.SCA if self._activeInstance == "A" else self.SCB
 
 	def set_instance(self, inst):
 		self._activeInstance = inst
 
-	def chk_connection(self):
-		self.get_instance()
-
+	def chk_connection(self, gcmd=None):
+		self.get_instance(gcmd)
 		if not self._instance.isConnected:
 			self._setResponse(smuff_core.T_NOT_CONN, False, self._instance)
 			return False
@@ -363,7 +377,7 @@ class SMuFF:
     # SMUFF_CONN
     #
 	def cmd_connect(self, gcmd=None, autoConnect=None):
-		self.get_instance()
+		self.get_instance(gcmd)
 		if self._instance.isConnected:
 			self._setResponse(smuff_core.T_ALDY_CONN, False, self._instance)
 			return True
@@ -380,14 +394,14 @@ class SMuFF:
     # SMUFF_DISC
     #
 	def cmd_disconnect(self, gcmd=None):
-		self.get_instance()
+		self.get_instance(gcmd)
 		self._instance.close_serial()
 
     #
     # SMUFF_CONNECTED
     #
 	def cmd_connected(self, gcmd):
-		self.get_instance()
+		self.get_instance(gcmd)
 		if self._instance.isConnected:
 			self._setResponse(smuff_core.T_IS_CONN.format(self._instance.serialPort), False, self._instance)
 		else:
@@ -397,7 +411,7 @@ class SMuFF:
     # SMUFF_CUT
     #
 	def cmd_cut(self, gcmd=None):
-		if not self.chk_connection():
+		if not self.chk_connection(gcmd):
 			return
 		self._setResponse(smuff_core.T_CUTTING, False, self._instance)
 		self._instance.send_SMuFF(smuff_core.CUT)
@@ -406,7 +420,7 @@ class SMuFF:
     # SMUFF_WIPE
     #
 	def cmd_wipe(self, gcmd=None):
-		if not self.chk_connection():
+		if not self.chk_connection(gcmd):
 			return
 		self._setResponse(smuff_core.T_WIPING, False, self._instance)
 		self._instance.send_SMuFF(smuff_core.WIPE)
@@ -415,7 +429,7 @@ class SMuFF:
     # SMUFF_LID_OPEN
     #
 	def cmd_lid_open(self, gcmd=None):
-		if not self.chk_connection():
+		if not self.chk_connection(gcmd):
 			return
 		self._setResponse(smuff_core.T_OPENING_LID, False, self._instance)
 		self._instance.send_SMuFF(smuff_core.LIDOPEN)
@@ -424,7 +438,7 @@ class SMuFF:
     # SMUFF_LID_CLOSE
     #
 	def cmd_lid_close(self, gcmd=None):
-		if not self.chk_connection():
+		if not self.chk_connection(gcmd):
 			return
 		self._setResponse(smuff_core.T_CLOSING_LID, False, self._instance)
 		self._instance.send_SMuFF(smuff_core.LIDCLOSE)
@@ -433,7 +447,7 @@ class SMuFF:
     # SMUFF_SET_SERVO
     #
 	def cmd_servo_pos(self, gcmd=None):
-		if not self.chk_connection():
+		if not self.chk_connection(gcmd):
 			return
 		if gcmd:
 			servo = gcmd.get_int(smuff_core.P_SERVO, default=1) 	# Lid servo by default
@@ -448,7 +462,7 @@ class SMuFF:
     # SMUFF_TOOL_CHANGE
     #
 	def cmd_tool_change(self, gcmd=None):
-		if not self.chk_connection():
+		if not self.chk_connection(gcmd):
 			return
 		self._instance.klipper_change_tool(gcmd)
 
@@ -456,7 +470,7 @@ class SMuFF:
     # SMUFF_INFO
     #
 	def cmd_fw_info(self, gcmd=None):
-		if not self.chk_connection():
+		if not self.chk_connection(gcmd):
 			return
 		self._setResponse(smuff_core.T_FW_INFO.format(self._instance.get_fw_info()), False, self._instance)
 
@@ -464,7 +478,7 @@ class SMuFF:
     # SMUFF_STATUS
     #
 	def cmd_get_states(self, gcmd=None):
-		self.get_instance()
+		self.get_instance(gcmd)
 		connStat = self._instance.get_states(gcmd)
 		self._setResponse(connStat, False, self._instance)
 
@@ -472,7 +486,7 @@ class SMuFF:
     # SMUFF_SEND
     #
 	def cmd_gcode(self, gcmd=None):
-		if not self.chk_connection():
+		if not self.chk_connection(gcmd):
 			return
 		if gcmd == None:
 			return
@@ -491,7 +505,7 @@ class SMuFF:
     # SMUFF_PARAM
     #
 	def cmd_param(self, gcmd=None):
-		if not self.chk_connection():
+		if not self.chk_connection(gcmd):
 			return
 		if gcmd == None:
 			return
@@ -511,7 +525,7 @@ class SMuFF:
     # SMUFF_MATERIALS
     #
 	def cmd_materials(self, gcmd=None):
-		if not self.chk_connection():
+		if not self.chk_connection(gcmd):
 			return
 		self._instance.send_SMuFF(smuff_core.GETCONFIG.format(smuff_core.CFG_MATERIALS))
 
@@ -519,7 +533,7 @@ class SMuFF:
     # SMUFF_SWAPS
     #
 	def cmd_swaps(self, gcmd=None):
-		if not self.chk_connection():
+		if not self.chk_connection(gcmd):
 			return
 		self._instance.send_SMuFF(smuff_core.GETCONFIG.format(smuff_core.CFG_SWAPS))
 
@@ -527,7 +541,7 @@ class SMuFF:
     # SMUFF_LIDMAPPINGS
     #
 	def cmd_lidmappings(self, gcmd=None):
-		if not self.chk_connection():
+		if not self.chk_connection(gcmd):
 			return
 		self._instance.send_SMuFF(smuff_core.GETCONFIG.format(smuff_core.CFG_SERVOMAPS))
 
@@ -535,7 +549,7 @@ class SMuFF:
     # SMUFF_LOAD
     #
 	def cmd_load(self, gcmd=None):
-		if not self.chk_connection():
+		if not self.chk_connection(gcmd):
 			return
 		if not self._okTimer is None:
 			self._setResponse(smuff_core.T_NOT_READY, False, self._instance)
@@ -549,7 +563,7 @@ class SMuFF:
     # SMUFF_UNLOAD
     #
 	def cmd_unload(self, gcmd=None):
-		if not self.chk_connection():
+		if not self.chk_connection(gcmd):
 			return
 		if not self._okTimer is None:
 			self._setResponse(smuff_core.T_NOT_READY, False, self._instance)
@@ -563,7 +577,7 @@ class SMuFF:
     # SMUFF_HOME
     #
 	def cmd_home(self, gcmd=None):
-		if not self.chk_connection():
+		if not self.chk_connection(gcmd):
 			return
 		self._instance.send_SMuFF(smuff_core.HOME)
 
@@ -571,7 +585,7 @@ class SMuFF:
     # SMUFF_MOTORS_OFF
     #
 	def cmd_motors_off(self, gcmd=None):
-		if not self.chk_connection():
+		if not self.chk_connection(gcmd):
 			return
 		self._instance.send_SMuFF(smuff_core.MOTORSOFF)
 
@@ -579,7 +593,7 @@ class SMuFF:
     # SMUFF_CLEAR_JAM
     #
 	def cmd_clear_jam(self, gcmd=None):
-		if not self.chk_connection():
+		if not self.chk_connection(gcmd):
 			return
 		self._instance.send_SMuFF(smuff_core.UNJAM)
 
@@ -587,7 +601,7 @@ class SMuFF:
     # SMUFF_RESET
     #
 	def cmd_reset(self, gcmd=None):
-		if not self.chk_connection():
+		if not self.chk_connection(gcmd):
 			return
 		self._instance.send_SMuFF(smuff_core.RESET)
 
@@ -595,14 +609,14 @@ class SMuFF:
     # SMUFF_VERSION
     #
 	def cmd_version(self, gcmd=None):
-		self.get_instance()
+		self.get_instance(gcmd)
 		self._setResponse(smuff_core.VERSION_STRING.format(smuff_core.VERSION_NUMBER, smuff_core.VERSION_DATE), False, self._instance)
 
     #
     # SMUFF_RESET_AVG
     #
 	def cmd_reset_avg(self, gcmd=None):
-		self.get_instance()
+		self.get_instance(gcmd)
 		self._instance.reset_avg()
 		self._setResponse(smuff_core.T_OK, False, self._instance)
 
@@ -627,9 +641,15 @@ class SMuFF:
 		if param == "A" or param == "B":
 			self.set_instance(param)
 		else:
-			self.gcode.respond_info(smuff_core.T_INVALID_STATE)
+			self.gcode.respond_info(smuff_core.T_INVALID_DEVICE)
 			return
 		self.gcode.respond_info(smuff_core.T_OK)
+
+    #
+    # SMUFF_GETINSTANCE
+    #
+	def cmd_getinstance(self, gcmd=None):
+		self.gcode.respond_info(smuff_core.T_ACTIVE_INSTANCE.format(self._activeInstance))
 
     #
     # SMUFF_TEST
@@ -642,7 +662,7 @@ class SMuFF:
 	#
 	def get_status(self, eventtime=None):
 		#self._log.info("get_status being called. M:{0} S:{1} ")
-		self.get_instance()
+		self.get_instance(None)
 		return self._instance.get_status()
 
 
