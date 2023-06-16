@@ -49,7 +49,7 @@ parse_instances()
         printf "\n"
         read -e -p "Enter the instance number in which to install SMuFF: " -i "${default}" instance
 
-        if [ $instance > 0 && $instance < $ndx ] ; then
+        if [[ $instance > 0 && $instance < $ndx ]] ; then
             KLIPPER_CONFIG_PATH="${HOME_PATH}/${instances[$instance-1]}/config"
             MOONRAKER_CONFIG="${KLIPPER_CONFIG_PATH}/moonraker.conf"
             break
@@ -124,4 +124,5 @@ query_instance
 link_extensions
 copy_configs
 add_updater
+
 printf "\n${GREEN}Done.\n\n${CYAN}Don't forget to edit the 'smuff.cfg' file before you restart the firmware!${WHITE}\n\n\n"
