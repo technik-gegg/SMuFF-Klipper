@@ -101,7 +101,7 @@ In order to get the SMuFF module updated automatically as I release new versions
 >*The configuration files won't be copied if they already exist within the klipper_config folder to prevent overwriting your existing settings on an update!
 Hence, if changes within the config files need to be applied, you have to apply them manually. Always check the **Recent Changes** section to see whether you need to apply changes for an updated version.*
 
->**Also keep in mind:**
+>**Also:**
 If the Update Manager shows you a warning/error for the SMuFF module, try a hard-reset first. If the error says the repository is not being "pristine", add the **enable_repo_debug** setting to the update_manager section in *moonraker.conf* and set it to True, i.e.:
 >
 >[update_manager]
@@ -113,9 +113,10 @@ enable_repo_debug: True
 All the basic settings for the module are located in the **smuff.cfg** file, which eventually has to be included in your **printer.cfg** file. The settings shown in the example below reflect the standard configuration. The only modification you may need to make are for *commandTimeout* and *toolchangeTimeout*. Those depend on the environment your SMuFF is running in.
 
 ```Python
-
 [smuff]
 serial=/dev/serial/ttySMuFF
+serialB=
+hasIDEX=no
 baudrate=115200
 serialTimeout=10
 autoConnectSerial=yes
@@ -125,10 +126,24 @@ watchdogTimeout=30
 hasCutter=yes
 hasWiper=no
 debug=no
+ignoreDebug=yes
+```
+
+For using two SMuFFs on an IDEX machine, you'll need to set **hasIDEX** to *True*, define a valid device in **serialB** and extend the configuration with the following lines:
+
+```Python
+baudrateB=115200
+serialTimeoutB=5
+autoConnectSerialB=yes
+commandTimeoutB=20
+toolchangeTimeoutB=90
+hasCutterB=yes
+hasWiperB=no
+watchdogTimeoutB=30
 ```
 
 Most of the settings in here are self explanatory. The **autoConnectSerial** will automatically establish a connection to the SMuFF after a restart of Klipper, if set to *yes*.
-The latter option **debug** is set to *no* by default. Set this to *yes* if you are troubleshooting and need to know a bit more about what the SMuFF is doing/sending. Turn it back off when you're finished, otherwise it may overwhelm your Klipper log file.
+The option **debug** is set to *no* by default. Set this to *yes* if you are troubleshooting and need to know a bit more about what the SMuFF is doing/sending. Turn it back off when you're finished, otherwise it may overwhelm your Klipper log file.
 
 ## Troubleshooting
 
@@ -138,6 +153,12 @@ If you run into some issues / strange behaviours when connecting the SMuFF to Kl
 tail -f ~/klipper_logs/klippy.log | grep -A5 "SMuFF" || "Trace"
 ```
 
+Or, on newer Klipper installations, use:
+
+```sh
+tail -f ~/printer_data/logs/klippy.log | grep -A5 "SMuFF" || "Trace"
+```
+
 This way only SMuFF related logs and Tracebacks (Exceptions) are being shown continously. It helped me a lot while developing the module, so it might be helpful for you too.
 *For tracebacks you may have to adjust the -A parameter and nudge up the number to see the full trace.*
 
@@ -145,10 +166,13 @@ This way only SMuFF related logs and Tracebacks (Exceptions) are being shown con
 
 ## Recent changes
 
-**V1.14** - Updated for the latest Klipper version
+**V1.14** - Updated for the latest Klipper version v0.11.0-219
 
-- changed installer to support the new multi-printer environment. By default, i.e. for a single printer, files are going to be installed in the **~/printer_data/config** folder. Though, the installer will ask you politely, if that's what you want. *On older Klipper installations, the installation behaviour will not change.*
-- updated module *smuff.py* to utilize the *smuff_core.py* module, which encapsules the whole SMuFF logic and is the same code as for my OctoPrint plugin.
+- changed installer to support the new multi-printer environments. By default, i.e. for a single printer, files are going to be installed in the **~/printer_data/config** folder. Though, the installer will ask you politely, if that's what you want. *On older Klipper installations, the installation behaviour does not change!*
+- added command line parameter 'uninstall' to *install-smuff.sh* in order to undo the installation.
+- updated module *smuff.py* to utilize the *smuff_core.py* module, which encapsulates the SMuFF logic and is the same module as for my OctoPrint plugin, which makes maintaining both modules/plugins a bit easier.
+- integrated using two SMuFFs on an IDEX machine, one for each extruder. See tool change GCode macros in *smuff.cfg* for further explanation.
+**This option is yet experimental, so use it with care! If you give it a try, drop me a note over on Discord and let me know how it's doing.**
 
 **V1.13** - Added watchdogTimeout setting to smuff.cfg
 

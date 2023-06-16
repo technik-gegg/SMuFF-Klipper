@@ -26,6 +26,7 @@ WHITE='\e[0;37m'
 CYAN='\e[1;36m'
 RED='\e[1;31m'
 GREEN='\e[1;32m'
+WARNING='\e[41m\e[1;37m'
 
 # List printer instances
 parse_instances()
@@ -67,7 +68,7 @@ query_instance()
     else
         while true ; do
             parse_instances
-            printf  "\nSMuFF files will be installed in folder: ${GREEN}%s${WHITE}.\n" ${KLIPPER_CONFIG_PATH}
+            printf  "\nThe target folder will be: ${GREEN}%s${WHITE}.\n" ${KLIPPER_CONFIG_PATH}
             read -e -p "Is this correct (y/n)? " -i "y" answer
             if [ $answer == "Y" ] || [ $answer == "y" ] ; then
                 echo -e "${GREEN}Ok.${WHITE}"
@@ -77,7 +78,7 @@ query_instance()
     fi
 }
 
-# Create a link extension to Klipper
+# Create symlinks in Klipper 'extras' folder
 link_extensions()
 {
     for mod in ${MODULES[@]} ; do
@@ -91,6 +92,19 @@ link_extensions()
     done
 }
 
+# Remove symlinks from Klipper 'extras' folder
+unlink_extensions()
+{
+    for mod in ${MODULES[@]} ; do
+        if [ -L ${SYMLINK}${mod} ] ; then
+            echo "Removing symlink for file ${mod} in ${SYMLINK} ..."
+            rm "${SYMLINK}${mod}"
+        else
+            echo -e "${RED}Link for '${mod}' does not exists.${WHITE}"
+        fi
+    done
+}
+
 # Copy config files into the Klipper configs folder
 copy_configs()
 {
@@ -101,6 +115,17 @@ copy_configs()
             echo "Copying ${SRCDIR}/${cfg} to ${KLIPPER_CONFIG_PATH}/${cfg} ..."
             cp "${SRCDIR}/${cfg}" "${KLIPPER_CONFIG_PATH}/"
             chmod 755 "${KLIPPER_CONFIG_PATH}/${cfg}"
+        fi
+    done
+}
+
+# Delete config files from the Klipper configs folder
+delete_configs()
+{
+    for cfg in ${CONFIGS[@]} ; do
+        if [ -e "${KLIPPER_CONFIG_PATH}/${cfg}" ] ; then
+            echo "Removing ${KLIPPER_CONFIG_PATH}/${cfg} ..."
+            rm "${KLIPPER_CONFIG_PATH}/${cfg}"
         fi
     done
 }
@@ -120,9 +145,34 @@ add_updater()
 }
 
 # Execute steps sequentially
+force_uninst=0
+if [ -n "$1" ] && [ $1 == "uninstall" ] ; then
+    printf "\n${WARNING}*** WARNING! This script will remove all SMuFF files. ***${WHITE}\n\n"
+    printf "\n${CYAN}Do you want to proceed (y/n)? ${WHITE}"
+    read -e -i "n" answer
+    if [ $answer == "N" ] || [ $answer == "n" ] ; then
+        echo -e "${GREEN}Aborted.${WHITE}"
+        exit -1
+    fi
+    force_uninst=1
+fi
 query_instance
-link_extensions
-copy_configs
-add_updater
+if [ $force_uninst == 1 ] ; then
+    unlink_extensions
+    delete_configs
+    cd ${HOME_PATH}
+    printf "\n${CYAN}Do you want me to delete the installation folder ${SRCDIR} (y/n)? ${WHITE}"
+    read -e -i "n" answer
+    if [ $answer == "Y" ] || [ $answer == "y" ] ; then
+        rm -r -f ${SRCDIR}
+        rmdir ${SRCDIR}
+    fi
 
-printf "\n${GREEN}Done.\n\n${CYAN}Don't forget to edit the 'smuff.cfg' file before you restart the firmware!${WHITE}\n\n\n"
+    printf "\n${GREEN}Done.\n\n${CYAN}Don't forget to remove the updater in moonraker.conf manually!${WHITE}\n\n\n"
+else
+    link_extensions
+    copy_configs
+    add_updater
+
+    printf "\n${GREEN}Done.\n\n${CYAN}Don't forget to edit the 'smuff.cfg' file before you restart the firmware!${WHITE}\n\n\n"
+fi

@@ -119,10 +119,12 @@ FW-Options:\t{17}
 ------------------------
 Tool changes:\t{18}
 Avg. duration:\t{19:4.2f} secs.\n"""
-T_SET_PURGE 	= "Purge {0} mm after tool change has been set"
-T_RESET_PURGE 	= "Purge has been reset"
-T_PURGING 		= "Purging {0} mm with speed {1} mm/s"
-T_NO_IDEX		= "IDEX hasn't been configured!"
+T_SET_PURGE 		= "Purge {0} mm after tool change has been set"
+T_RESET_PURGE 		= "Purge has been reset"
+T_PURGING 			= "Purging {0} mm with speed {1} mm/s"
+T_NO_IDEX			= "IDEX hasn't been configured!"
+T_INVALID_DEVICE 	= "Invalid device! Use either \"A\" or \"B\" as parameter."
+T_ACTIVE_INSTANCE 	= "Current active instance is \"SMuFF {0}\"."
 
 # Help texts for commands
 T_HELP_CONN 		= "Connect to the SMuFF."
@@ -151,6 +153,7 @@ T_HELP_VERSION		= "Query the version of this module."
 T_HELP_RESET_AVG	= "Reset tool change average statistics."
 T_HELP_DUMP_RAW		= "Prints out raw sent/received data (for debugging only)."
 T_HELP_INSTANCE 	= "Switches the active SMUFF instance on an IDEX machine."
+T_HELP_GETINSTANCE 	= "Reports the active SMUFF instance on an IDEX machine."
 
 # Response strings coming from SMuFF
 R_START			= "start\n"
@@ -204,6 +207,7 @@ P_GCODE			= "GCODE"   		# used in SMUFF_SEND (i.e. GCODE="M119")
 P_PARAM			= "PARAM" 			# used in SMUFF_PARAM (i.e. PARAM="BowdenLen")
 P_PARAMVAL		= "VALUE"  			# used in SMUFF_PARAM (i.e. VALUE="620")
 P_ENABLE 		= "ENABLE"			# used in SMUFF_DUMP_RAW
+P_DEVICE		= "DEV"				# used for device switching (A/B)
 
 # GCode macros called
 PRE_TC 			= "PRE_TOOLCHANGE"
@@ -593,7 +597,7 @@ class SmuffCore():
 			tb = traceback.format_exception(exc_type, exc_value, exc_traceback)
 			err = "Can't open serial port '{0}'!\n\t{1}".format(self.serialPort, tb)
 			self._log.error(err)
-			if not self._responseCB == None:
+			if self._responseCB:
 				self._responseCB(err)
 
 
@@ -651,7 +655,7 @@ class SmuffCore():
 			tb = traceback.format_exception(exc_type, exc_value, exc_traceback)
 			err = "Can't close serial port {0}!\n\t{1}".format(self.serialPort, tb)
 			self._log.error(err)
-			if not self._responseCB == None:
+			if self._responseCB:
 				self._responseCB(err)
 
 	#
@@ -860,7 +864,7 @@ class SmuffCore():
 				self._response = None
 			else:
 				resp = "*** Timed out *** while waiting for a response on cmd '{0}'. Try increasing the {1} timeout (={2} sec.).".format(data, tmName, timeout)
-				if not self._responseCB == None:
+				if self._responseCB:
 					self._responseCB(resp)
 				self._log.info(resp)
 				if self.isBusy == False:
@@ -1006,7 +1010,7 @@ class SmuffCore():
 					except Exception as err:
 						self._log.error("Sending response to Klipper has thrown an exception:\n\t{0}".format(err))
 				else:
-					if not self._responseCB == None:
+					if self._responseCB:
 						self._responseCB(resp)
 
 
@@ -1119,9 +1123,9 @@ class SmuffCore():
 			# don't process any general debug messages
 			index = len(R_ECHO)+1
 			if data[index:].startswith(R_DEBUG):
+				err = "SMuFF has sent a debug response: [{0}]".format(data.rstrip())
+				self._log.debug(err)
 				if not self.ignoreDebug:
-					err = "SMuFF has sent a debug response: [{0}]".format(data.rstrip())
-					self._log.debug(err)
 					# filter out ESC sequences
 					match = re.sub(r'\033\[\d+m', '', err)
 					if match != None:
@@ -1129,7 +1133,7 @@ class SmuffCore():
 					if self._isKlipper:
 						self.gcode.respond_info(err)
 					else:
-						if not self._responseCB == None:
+						if self._responseCB:
 							self._responseCB(err)
 			# but do process the tool/endstop states
 			elif data[index:].startswith(R_STATES):
@@ -1141,7 +1145,7 @@ class SmuffCore():
 				if self._isKlipper:
 					self.gcode.respond_info(err)
 				else:
-					if not self._responseCB == None:
+					if self._responseCB:
 						self._responseCB(err)
 				self._set_busy(True)
 			return
@@ -1152,7 +1156,7 @@ class SmuffCore():
 			if self._isKlipper:
 				self.gcode.respond_info(err)
 			else:
-				if not self._responseCB == None:
+				if self._responseCB:
 					self._responseCB(err)
 			index = len(R_ERROR)+1
 			# maybe the SMuFF has received garbage
@@ -1221,7 +1225,7 @@ class SmuffCore():
 			self.fwInfo = data.rstrip("\n")
 			if self._isKlipper:
 				self.gcode.respond_info(T_FW_INFO.format(self.fwInfo))
-			if not self._responseCB == None:
+			if self._responseCB:
 				self._responseCB(T_FW_INFO.format(self.fwInfo))
 			self._lastCmdSent = None
 			try:
