@@ -1,0 +1,14 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<!--Generator: Xara Designer (www.xara.com), SVG filter version: 6.0.0.3-->
+<svg stroke-width="0.501" stroke-linejoin="bevel" fill-rule="evenodd" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns="http://www.w3.org/2000/svg" version="1.1" overflow="visible" width="48pt" height="48pt" viewBox="0 0 48 48">
+ <defs>
+	</defs>
+ <g id="Document" fill="none" stroke="black" font-family="Times New Roman" font-size="16" transform="scale(1 -1)">
+  <g id="Spread" transform="translate(0 -48)">
+   <g id="Layer 1">
+    <path d="M 1.54,0 L 19.973,48 L 26.816,48 L 46.46,0 L 39.225,0 L 33.627,14.538 L 13.556,14.538 L 8.284,0 L 1.54,0 Z M 15.388,19.711 L 31.662,19.711 L 26.65,33.004 C 25.123,37.043 23.99,40.361 23.247,42.958 C 22.636,39.88 21.774,36.826 20.66,33.789 L 15.388,19.711 Z" fill-rule="nonzero" stroke-linejoin="round" stroke-linecap="round" stroke="none" stroke-width="0.7" fill="#f3f2f2" marker-start="none" marker-end="none" stroke-miterlimit="79.8403193612775"/>
+   </g>
+  </g>
+ </g>
+</svg>

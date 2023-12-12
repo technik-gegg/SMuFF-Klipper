@@ -12,12 +12,17 @@ KLIPPER_PATH="${HOME}/klipper"
 KLIPPER_CONFIG_PATH="${KLIPPER_PATH}_config"                # old config folder; may be replaced by query_instance()
 MOONRAKER_CONFIG="${KLIPPER_CONFIG_PATH}/moonraker.conf"    # old config folder; may be replaced by query_instance()
 SRCDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"  # source directory taken from the pathname of this script
+ICONDIR="${SRCDIR}/KlipperScreen-images"                    # source directory for KlipperScreen images
 DEFAULT_INSTANCE="printer_data"                             # default single printer instance folder name
+KLIPPERSCREEN_PATH="${HOME}/KlipperScreen"                  # path for KlipperScreen
+KS_THEMES_PATH="${KLIPPERSCREEN_PATH}/styles"               # path for KlipperScreen themes
 
 # Module specific runtime vars
 MODULES=("smuff.py" "smuff_core.py")                        # modules to symlink
-CONFIGS=("smuff.cfg" "smuff_menu.cfg" "smuff_runout.cfg")   # config-files to copy
+CONFIGS=("smuff.cfg" "smuff_menu.cfg" "smuff_menu_ks.cfg" "smuff_runout.cfg")   # config-files to copy
 SYMLINK="${KLIPPER_PATH}/klippy/extras/"                    # symlink folder
+ICONS=("smuff.svg" "close_lid.svg" "cut_filament.svg" "instance_a.svg" "instance_b.svg" "load_filament.svg" "open_lid.svg" "purge_filament.svg" "reset.svg" "swap_tools.svg" "unjam.svg" "unload_filament.svg" "wipe_nozzle.svg")   # image-files to copy
+THEMES=("colorized" "material-dark" "material-darker" "material-light" "z-bolt")   # default KlipperScreen theme folders
 
 UPDATE_INFO="already exists! Please update its contents manually if needed."
 
@@ -119,6 +124,28 @@ copy_configs()
     done
 }
 
+# Copy image files into the KlipperScreen styles folders
+copy_images()
+{
+    if [ -e "${KLIPPERSCREEN_PATH}" ] ; then
+        for theme in ${THEMES[@]} ; do
+            if [ -e "${KS_THEMES_PATH}/${theme}/" ] ; then
+                for icon in ${ICONS[@]} ; do
+                    if [ -e "${KS_THEMES_PATH}/${theme}/${icon}" ] ; then
+                        echo -e "${CYAN}File '${icon}' ${UPDATE_INFO}${WHITE}"
+                    else
+                        echo "Copying ${ICONDIR}/${icon} to ${KS_THEMES_PATH}/${theme}/${icon} ..."
+                        cp "${ICONDIR}/${icon}" "${KS_THEMES_PATH}/${theme}/"
+                        chmod 644 "${KS_THEMES_PATH}/${theme}/${icon}"
+                    fi
+                done
+            fi
+        done
+    else
+        echo -e "${CYAN}KlipperScreen folder not found, skipping copying images!${WHITE}"
+    fi
+}
+
 # Delete config files from the Klipper configs folder
 delete_configs()
 {
@@ -172,6 +199,7 @@ if [ $force_uninst == 1 ] ; then
 else
     link_extensions
     copy_configs
+    copy_images
     add_updater
 
     printf "\n${GREEN}Done.\n\n${CYAN}Don't forget to edit the 'smuff.cfg' file before you restart the firmware!${WHITE}\n\n\n"

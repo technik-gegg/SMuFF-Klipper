@@ -200,7 +200,6 @@ class SMuFF:
 		self._printer 		= config.get_printer()
 		self._reactor 		= self._printer.get_reactor()
 		self.gcode 			= self._printer.lookup_object("gcode")
-		self._okTimer 		= None		# (reactor) timer waiting for OK response
 		self._lastActiveA 	= False
 		self._lastActiveB 	= False
 
@@ -356,11 +355,13 @@ class SMuFF:
 
 	def get_instance(self, gcmd=None):
 		if gcmd:
-			device = gcmd.get(smuff_core.P_DEVICE, default="").upper()
+			device = gcmd.get(smuff_core.P_DEVICE, default="A").upper()
 			if device == "A" or device == "B":
 				self._activeInstance = device
 			else:
 				self.gcode.respond_info(smuff_core.T_INVALID_DEVICE)
+		else:
+			self._activeInstance = "A"  # make the first device the default
 		self._instance = self.SCA if self._activeInstance == "A" else self.SCB
 
 	def set_instance(self, inst):
@@ -551,13 +552,13 @@ class SMuFF:
 	def cmd_load(self, gcmd=None):
 		if not self.chk_connection(gcmd):
 			return
-		if not self._okTimer is None:
+		if not self._instance._okTimer is None:
 			self._setResponse(smuff_core.T_NOT_READY, False, self._instance)
 			return
-		activeTool = self._instance.parse_tool_number(self._instance.get_active_tool())
+		activeTool = self._instance.get_active_tool()
 		if activeTool != -1:
 			self._instance.send_SMuFF(smuff_core.LOADFIL)
-			self._okTimer = self._reactor.register_timer(self._instance.wait_for_ok, self._reactor.NOW + 5.0)
+			self._instance._okTimer = self._reactor.register_timer(self._instance.wait_for_ok, self._reactor.NOW + 5.0)
 
     #
     # SMUFF_UNLOAD
@@ -565,13 +566,13 @@ class SMuFF:
 	def cmd_unload(self, gcmd=None):
 		if not self.chk_connection(gcmd):
 			return
-		if not self._okTimer is None:
+		if not self._instance._okTimer is None:
 			self._setResponse(smuff_core.T_NOT_READY, False, self._instance)
 			return
-		activeTool = self._instance.parse_tool_number(self._instance.get_active_tool())
+		activeTool = self._instance.get_active_tool()
 		if activeTool != -1:
 			self._instance.send_SMuFF(smuff_core.UNLOADFIL)
-			self._okTimer = self._reactor.register_timer(self._instance.wait_for_ok, self._reactor.NOW + 5.0)
+			self._instance._okTimer = self._reactor.register_timer(self._instance.wait_for_ok, self._reactor.NOW + 5.0)
 
     #
     # SMUFF_HOME

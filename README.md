@@ -166,6 +166,11 @@ This way only SMuFF related logs and Tracebacks (Exceptions) are being shown con
 
 ## Recent changes
 
+**V1.15** - Added menu for KlipperScreen
+
+- in order to enable this menu, you have to add an **[include smuff_menu_ks.cfg]** into your *KlipperScreen.conf*
+- fixed "not loading/unloading" bug
+
 **V1.14** - Updated for the latest Klipper version v0.11.0-219
 
 - changed installer to support the new multi-printer environments. By default, i.e. for a single printer, files are going to be installed in the **~/printer_data/config** folder. Though, the installer will ask you politely, if that's what you want. *On older Klipper installations, the installation behaviour does not change!*
