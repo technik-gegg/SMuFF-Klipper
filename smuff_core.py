@@ -13,8 +13,8 @@ try:
 except ImportError:
     logging.critical("SMuFF: Python library 'pySerial' is missing. Please use 'pip install pyserial' first!")
 
-VERSION_NUMBER 	= 1.14 					# Module version number (for scripting)
-VERSION_DATE 	= "2023/06/15"
+VERSION_NUMBER 	= 1.16 					# Module version number (for scripting)
+VERSION_DATE 	= "2023/12/14"
 VERSION_STRING	= "SMuFF Module V{0} ({1})" # Module version string
 
 FWINFO			= "M115"				# SMuFF GCode to query firmware info
@@ -538,7 +538,8 @@ class SmuffCore():
 		elif self._initState == 3:
 			# request firmware info from SMuFF
 			if self.isProcessing == False:
-				self.send_SMuFF(FWINFO)
+				if self.fwInfo == "?":
+					self.send_SMuFF(FWINFO)
 		elif self._initState == 4:
 			# query tool swap configuration settings
 			if self.isProcessing == False:

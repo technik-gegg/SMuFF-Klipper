@@ -166,6 +166,12 @@ This way only SMuFF related logs and Tracebacks (Exceptions) are being shown con
 
 ## Recent changes
 
+**V1.16** - Added print outs for some commands
+
+- corrected version number
+- changed logger to print into separate logfile (smuff.log)
+- added a console print out for *SMUFF_MATERIALS*, *SMUFF_SWAPS* and *SMUFF_LIDMAPPINGS*
+
 **V1.15** - Added menu for KlipperScreen
 
 - in order to enable this menu, you have to add an **[include smuff_menu_ks.cfg]** into your *KlipperScreen.conf*

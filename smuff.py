@@ -2,7 +2,7 @@
 # SMuFF Klipper Module
 #---------------------------------------------------------------------------------------------
 #
-# Copyright (C) 2022 Technik Gegg <technik.gegg@gmail.com>
+# Copyright (C) 2022-2024 Technik Gegg <technik.gegg@gmail.com>
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 #
@@ -176,17 +176,26 @@ IS_KLIPPER		= True 				# flag has to be set to True for Klipper
 class SLogger:
 	def __init__(self, prefix):
 		self._prefix = prefix
-		pass
+		self._logger = None
+		if self._prefix == None: # create separate logfile
+			logHandler = logging.FileHandler(filename="/var/tmp/smuff.log", encoding="utf-8")
+			logHandler.setLevel(logging.DEBUG)
+			logFormat = logging.Formatter("%(asctime)s %(levelname)-7s: %(message)s")
+			logHandler.setFormatter(logFormat)
+			self._logger = logging.getLogger("SMuFF")
+			self._logger.addHandler(logHandler)
 
 	def info(self, message):
-		logging.info(self._prefix.format(message))
+		if self._logger != None:
+			self._logger.info(message)
 
 	def error(self, message):
-		logging.error(self._prefix.format(message))
+		if self._logger != None:
+			self._logger.error(message)
 
 	def debug(self, message):
-		logging.debug(self._prefix.format(message))
-
+		if self._logger != None:
+			self._logger.debug(message)
 
 class SMuFF:
 
@@ -528,7 +537,13 @@ class SMuFF:
 	def cmd_materials(self, gcmd=None):
 		if not self.chk_connection(gcmd):
 			return
-		self._instance.send_SMuFF(smuff_core.GETCONFIG.format(smuff_core.CFG_MATERIALS))
+		inst = self._instance
+		response = inst.send_SMuFF_and_wait(smuff_core.GETCONFIG.format(smuff_core.CFG_MATERIALS))
+		# print materials to console
+		if response:
+			for i in range(inst.toolCount):
+				material = inst.materials[i]
+				self._setResponse("Tool {0} is '{2} {1}' with a purge factor of {3}%".format(i, material[0], material[1], material[2]), False, inst)
 
     #
     # SMUFF_SWAPS
@@ -536,7 +551,13 @@ class SMuFF:
 	def cmd_swaps(self, gcmd=None):
 		if not self.chk_connection(gcmd):
 			return
-		self._instance.send_SMuFF(smuff_core.GETCONFIG.format(smuff_core.CFG_SWAPS))
+		inst = self._instance
+		response = inst.send_SMuFF_and_wait(smuff_core.GETCONFIG.format(smuff_core.CFG_SWAPS))
+		# print swaps to console
+		if response:
+			for i in range(inst.toolCount):
+				slot = inst.swaps[i]
+				self._setResponse("Tool {0} is assigned to slot {1}".format(i, slot), False, inst)
 
     #
     # SMUFF_LIDMAPPINGS
@@ -544,7 +565,13 @@ class SMuFF:
 	def cmd_lidmappings(self, gcmd=None):
 		if not self.chk_connection(gcmd):
 			return
-		self._instance.send_SMuFF(smuff_core.GETCONFIG.format(smuff_core.CFG_SERVOMAPS))
+		inst = self._instance
+		response = inst.send_SMuFF_and_wait(smuff_core.GETCONFIG.format(smuff_core.CFG_SERVOMAPS))
+		# print lid mappings to console
+		if response:
+			for i in range(inst.toolCount):
+				servoMap = inst.servoMaps[i]
+				self._setResponse("Tool {0} is closed @ {1} deg.".format(i, servoMap), False, inst)
 
     #
     # SMUFF_LOAD
@@ -672,7 +699,8 @@ class SMuFF:
 # Main entry point; Creates a new instance of this module.
 #
 def load_config(config):
-	logger = SLogger("SMuFF: {0}")
+	#logger = SLogger("SMuFF: {0}")
+	logger = SLogger(None)
 
 	try:
 		instance = SMuFF(config, logger)

@@ -14,6 +14,8 @@ MOONRAKER_CONFIG="${KLIPPER_CONFIG_PATH}/moonraker.conf"    # old config folder;
 SRCDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"  # source directory taken from the pathname of this script
 ICONDIR="${SRCDIR}/KlipperScreen-images"                    # source directory for KlipperScreen images
 DEFAULT_INSTANCE="printer_data"                             # default single printer instance folder name
+LOGS_PATH="${DEFAULT_INSTANCE}/logs"                        # default path for Klipper logfiles
+SMUFF_LOG_FILE="/var/tmp/smuff.log"                         # default path for SMuFF logfile
 KLIPPERSCREEN_PATH="${HOME}/KlipperScreen"                  # path for KlipperScreen
 KS_THEMES_PATH="${KLIPPERSCREEN_PATH}/styles"               # path for KlipperScreen themes
 
@@ -24,7 +26,9 @@ SYMLINK="${KLIPPER_PATH}/klippy/extras/"                    # symlink folder
 ICONS=("smuff.svg" "close_lid.svg" "cut_filament.svg" "instance_a.svg" "instance_b.svg" "load_filament.svg" "open_lid.svg" "purge_filament.svg" "reset.svg" "swap_tools.svg" "unjam.svg" "unload_filament.svg" "wipe_nozzle.svg")   # image-files to copy
 THEMES=("colorized" "material-dark" "material-darker" "material-light" "z-bolt")   # default KlipperScreen theme folders
 
-UPDATE_INFO="already exists! Please update its contents manually if needed."
+ALREADY_EXISTS="already exists!"
+UPDATE_INFO="${ALREADY_EXISTS} Please update its contents manually if needed."
+UPDATE_INFO_ICON="${ALREADY_EXISTS} Please copy it manually if needed."
 
 # Some colors for highlighting text
 WHITE='\e[0;37m'
@@ -58,6 +62,7 @@ parse_instances()
         if [[ $instance > 0 && $instance < $ndx ]] ; then
             KLIPPER_CONFIG_PATH="${HOME_PATH}/${instances[$instance-1]}/config"
             MOONRAKER_CONFIG="${KLIPPER_CONFIG_PATH}/moonraker.conf"
+            LOGS_PATH="${HOME_PATH}/${instances[$instance-1]}/logs"
             break
         else
             echo -e "${RED}#${instance} is not contained in the list. Try again or use ^C to abort.${WHITE}"
@@ -105,9 +110,32 @@ unlink_extensions()
             echo "Removing symlink for file ${mod} in ${SYMLINK} ..."
             rm "${SYMLINK}${mod}"
         else
-            echo -e "${RED}Link for '${mod}' does not exists.${WHITE}"
+            echo -e "${RED}Link for '${mod}' does not exist.${WHITE}"
         fi
     done
+}
+
+# Create symlink in printer 'logs' folder
+link_logfile()
+{
+    if [ ! -L ${LOGS_PATH}/smuff.log ] ; then
+        echo "*Created*" > "${SMUFF_LOG_FILE}"
+        echo "Creating symlink for logfile ..."
+        ln -sf "${SMUFF_LOG_FILE}" "${LOGS_PATH}/smuff.log"
+    else
+        echo -e "${RED}Link for 'smuff.log' already exists and is valid, skipping symlink creation.${WHITE}"
+    fi
+}
+
+# Remove symlink in printer 'logs' folder
+unlink_logfile()
+{
+    if [ -L ${LOGS_PATH}/smuff.log ] ; then
+        echo "Removing symlink for logfile ..."
+        rm "${LOGS_PATH}/smuff.log"
+    else
+        echo -e "${RED}Link for 'smuff.log' does not exist.${WHITE}"
+    fi
 }
 
 # Copy config files into the Klipper configs folder
@@ -132,7 +160,7 @@ copy_images()
             if [ -e "${KS_THEMES_PATH}/${theme}/" ] ; then
                 for icon in ${ICONS[@]} ; do
                     if [ -e "${KS_THEMES_PATH}/${theme}/${icon}" ] ; then
-                        echo -e "${CYAN}File '${icon}' ${UPDATE_INFO}${WHITE}"
+                        echo -e "${CYAN}File '${icon}' ${UPDATE_INFO_ICON}${WHITE}"
                     else
                         echo "Copying ${ICONDIR}/${icon} to ${KS_THEMES_PATH}/${theme}/${icon} ..."
                         cp "${ICONDIR}/${icon}" "${KS_THEMES_PATH}/${theme}/"
@@ -186,6 +214,7 @@ fi
 query_instance
 if [ $force_uninst == 1 ] ; then
     unlink_extensions
+    unlink_logfile
     delete_configs
     cd ${HOME_PATH}
     printf "\n${CYAN}Do you want me to delete the installation folder ${SRCDIR} (y/n)? ${WHITE}"
@@ -198,6 +227,7 @@ if [ $force_uninst == 1 ] ; then
     printf "\n${GREEN}Done.\n\n${CYAN}Don't forget to remove the updater in moonraker.conf manually!${WHITE}\n\n\n"
 else
     link_extensions
+    link_logfile
     copy_configs
     copy_images
     add_updater
